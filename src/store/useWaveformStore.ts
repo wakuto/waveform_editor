@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { WaveDromData, WaveSignal, WaveTool, AppState, StepClipboard, WaveGroup, WaveSignalOrGroup } from '../types/wavedrom';
 import { DEFAULT_WAVEFORM } from '../types/wavedrom';
-import { isWaveSignal, getSignalList } from '../utils/waveformUtils';
+import { isWaveSignal, getSignalList, resolveWave } from '../utils/waveformUtils';
 
 const MAX_HISTORY = 50;
 
@@ -54,6 +54,8 @@ interface WaveformStore extends AppState {
     setSelectedSignalIndex: (index: number | null) => void;
     setJsonPanelVisible: (visible: boolean) => void;
     setHoverInfo: (info: { signalIndex: number; stepIndex: number } | null) => void;
+    setEditingDataCell: (cell: { signalIndex: number; stepIndex: number } | null) => void;
+    openDataLabelEdit: (signalIndex: number, stepIndex: number) => void;
 
     // Undo/Redo
     undo: () => void;
@@ -416,6 +418,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     selectedSignalIndex: null,
     jsonPanelVisible: false,
     hoverInfo: null,
+    editingDataCell: null,
     statusMessage: '',
     insertCursor: null,
     stepSelection: null,
@@ -796,6 +799,21 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     setSelectedSignalIndex: (index) => set({ selectedSignalIndex: index }),
     setJsonPanelVisible: (visible) => set({ jsonPanelVisible: visible }),
     setHoverInfo: (info) => set({ hoverInfo: info }),
+    setEditingDataCell: (cell) => set({ editingDataCell: cell }),
+    openDataLabelEdit: (signalIndex, stepIndex) => {
+        const state = get();
+        const flatSignals = getSignalList(state.waveformData.signal);
+        if (signalIndex < 0 || signalIndex >= flatSignals.length) return;
+        const sig = flatSignals[signalIndex];
+        const resolved = resolveWave(sig.wave);
+        const rch = resolved[stepIndex];
+        if (!rch || (rch !== '=' && (rch < '2' || rch > '9'))) return;
+
+        let src = stepIndex;
+        while (src > 0 && sig.wave[src] === '.') src--;
+
+        set({ editingDataCell: { signalIndex, stepIndex: src } });
+    },
 
     // ─── 挿入カーソル・選択ツール ─────────────────────────────────────
     // カーソルを設定したら選択範囲をクリア（排他）

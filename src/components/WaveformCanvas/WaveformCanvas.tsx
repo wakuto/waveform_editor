@@ -1,8 +1,25 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useWaveformStore } from '../../store/useWaveformStore';
+import type { WaveTool } from '../../types/wavedrom';
 import { getSignalList, CELL_WIDTH, ROW_HEIGHT, LABEL_WIDTH } from '../../utils/waveformUtils';
 import WaveRow from './WaveRow';
 import styles from './WaveformCanvas.module.css';
+
+const TOOLS: { key: WaveTool; label: string; title: string }[] = [
+    { key: '0', label: '0', title: 'Low' },
+    { key: '1', label: '1', title: 'High' },
+    { key: 'p', label: 'p', title: 'Posedge Clock' },
+    { key: 'n', label: 'n', title: 'Negedge Clock' },
+    { key: 'z', label: 'z', title: 'High-Z' },
+    { key: 'x', label: 'x', title: 'Undefined' },
+    { key: '=', label: '=', title: 'Data' },
+    { key: '2', label: '2', title: 'Data (Orange)' },
+    { key: '3', label: '3', title: 'Data (Green)' },
+    { key: '4', label: '4', title: 'Data (Red)' },
+    { key: '.', label: '.', title: 'Continue' },
+    { key: '|', label: '|', title: 'Gap' },
+    { key: 'select', label: 'Select', title: 'Select Tool' },
+];
 
 /** ヘッダーのサイクル境界検知ゾーン (px) */
 const BOUNDARY_SNAP_PX = 8;
@@ -22,6 +39,7 @@ const WaveformCanvas: React.FC = () => {
     const waveformData = useWaveformStore((s) => s.waveformData);
     const hoverInfo = useWaveformStore((s) => s.hoverInfo);
     const selectedTool = useWaveformStore((s) => s.selectedTool);
+    const setSelectedTool = useWaveformStore((s) => s.setSelectedTool);
     const selectedSignalIndex = useWaveformStore((s) => s.selectedSignalIndex);
     const setSelectedSignalIndex = useWaveformStore((s) => s.setSelectedSignalIndex);
     const addSignal = useWaveformStore((s) => s.addSignal);
@@ -128,6 +146,12 @@ const WaveformCanvas: React.FC = () => {
 
     const handleContextMenu = useCallback(
         (e: React.MouseEvent, path: number[], type: 'signal' | 'group', name: string, flatIndex?: number, groupIndex?: number) => {
+            if (isToolMenuOpenRef.current || wasToolMenuOpenRef.current) {
+                e.preventDefault();
+                e.stopPropagation();
+                setContextMenu(null);
+                return;
+            }
             e.preventDefault();
             e.stopPropagation();
             // 編集中の場合はコンテキストメニューを出さない
@@ -147,11 +171,103 @@ const WaveformCanvas: React.FC = () => {
         [editingGroupIndex, editingIndex]
     );
 
+    const [toolMenu, setToolMenu] = useState<{ x: number; y: number } | null>(null);
+    const [hoveredTool, setHoveredTool] = useState<string | null>(null);
+    const isToolMenuOpenRef = useRef(false);
+    const wasToolMenuOpenRef = useRef(false);
+
+    // ツールメニューに表示するツールを絞り込む
+    const RADIAL_TOOLS = React.useMemo(() => {
+        const allowedKeys = ['0', '1', '=', 'x', '.', 'select'];
+        return TOOLS.filter(tool => allowedKeys.includes(tool.key));
+    }, []);
+
+    const handleGlobalMouseDown = useCallback((e: MouseEvent) => {
+        if (e.button === 2) { // Right click
+            // 波形領域内でのみツールメニューを表示する
+            const target = e.target as Element;
+            const isWaveArea = target.closest(`.${styles.waveArea}`) || target.closest(`.${styles.selectOverlay}`);
+
+            if (isWaveArea) {
+                setToolMenu({ x: e.clientX, y: e.clientY });
+                setHoveredTool(null);
+                isToolMenuOpenRef.current = true;
+                setContextMenu(null); // Close context menu if open
+            }
+        }
+    }, []);
+
+    const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
+        if (isToolMenuOpenRef.current && toolMenu) {
+            const dx = e.clientX - toolMenu.x;
+            const dy = e.clientY - toolMenu.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < 20) {
+                setHoveredTool(null);
+            } else {
+                let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                // SVGの描画が-90度（12時の方向）から始まっているため、判定用の角度も90度ずらす
+                angle += 90;
+                if (angle < 0) angle += 360;
+                angle = angle % 360;
+
+                const sliceAngle = 360 / RADIAL_TOOLS.length;
+                const offsetAngle = (angle + sliceAngle / 2) % 360;
+                const index = Math.floor(offsetAngle / sliceAngle);
+
+                if (index >= 0 && index < RADIAL_TOOLS.length) {
+                    setHoveredTool(RADIAL_TOOLS[index].key);
+                }
+            }
+        }
+    }, [toolMenu, RADIAL_TOOLS]);
+
+    const handleGlobalMouseUp = useCallback((e: MouseEvent) => {
+        if (e.button === 2) {
+            if (isToolMenuOpenRef.current) {
+                if (hoveredTool) {
+                    setSelectedTool(hoveredTool);
+                }
+
+                wasToolMenuOpenRef.current = true;
+                setTimeout(() => {
+                    wasToolMenuOpenRef.current = false;
+                }, 100);
+
+                setTimeout(() => {
+                    setToolMenu(null);
+                    setHoveredTool(null);
+                    isToolMenuOpenRef.current = false;
+                }, 50);
+            }
+        }
+    }, [hoveredTool, setSelectedTool]);
+
     React.useEffect(() => {
         const handleClick = () => setContextMenu(null);
         window.addEventListener('click', handleClick);
-        return () => window.removeEventListener('click', handleClick);
-    }, []);
+        window.addEventListener('mousedown', handleGlobalMouseDown);
+        window.addEventListener('mousemove', handleGlobalMouseMove);
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+
+        const handleGlobalContextMenu = (e: MouseEvent) => {
+            if (isToolMenuOpenRef.current || wasToolMenuOpenRef.current) {
+                e.preventDefault();
+                e.stopPropagation();
+                setContextMenu(null);
+            }
+        };
+        window.addEventListener('contextmenu', handleGlobalContextMenu, { capture: true });
+
+        return () => {
+            window.removeEventListener('click', handleClick);
+            window.removeEventListener('mousedown', handleGlobalMouseDown);
+            window.removeEventListener('mousemove', handleGlobalMouseMove);
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+            window.removeEventListener('contextmenu', handleGlobalContextMenu, { capture: true });
+        };
+    }, [handleGlobalMouseDown, handleGlobalMouseMove, handleGlobalMouseUp]);
 
     const handleGroupDoubleClick = useCallback(
         (groupIndex: number, groupName: string) => {
@@ -343,6 +459,20 @@ const WaveformCanvas: React.FC = () => {
         setHoverBoundary(null);
     }, []);
 
+    const handleWaveOverlayDoubleClick = useCallback(
+        (e: React.MouseEvent<HTMLDivElement>) => {
+            const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+            const relX = e.clientX - rect.left;
+            const relY = e.clientY - rect.top;
+
+            const signalIndex = getSignalIndexFromY(relY);
+            const stepIndex = Math.max(0, Math.min(Math.floor(relX / CELL_WIDTH), maxLen - 1));
+
+            useWaveformStore.getState().openDataLabelEdit(signalIndex, stepIndex);
+        },
+        [maxLen, getSignalIndexFromY]
+    );
+
     const totalWaveWidth = maxLen * CELL_WIDTH;
 
     return (
@@ -459,7 +589,9 @@ const WaveformCanvas: React.FC = () => {
                                                 autoFocus
                                             />
                                         ) : (
-                                            <span className={styles.groupName}>{groupName}</span>
+                                            <span className={styles.groupName}>
+                                                {groupName}
+                                            </span>
                                         )}
                                     </div>
                                     {!collapsedGroups.has(pathStr) && (
@@ -485,7 +617,6 @@ const WaveformCanvas: React.FC = () => {
                                         handleDrop(path);
                                     }}
                                     onDragLeave={() => setDragOver(null)}
-                                    onContextMenu={(e) => handleContextMenu(e, path, 'signal', sig.name, idx, undefined)}
                                 >
                                     {/* 信号ラベル */}
                                     <div
@@ -497,6 +628,7 @@ const WaveformCanvas: React.FC = () => {
                                             handleDragStart(path);
                                         }}
                                         onDoubleClick={() => handleLabelDoubleClick(idx, sig.name)}
+                                        onContextMenu={(e) => handleContextMenu(e, path, 'signal', sig.name, idx, undefined)}
                                     >
                                         {/* ネストの深さに応じたインジケーター */}
                                         {Array.from({ length: depth }).map((_, i) => (
@@ -516,7 +648,9 @@ const WaveformCanvas: React.FC = () => {
                                                 autoFocus
                                             />
                                         ) : (
-                                            <span className={styles.labelText}>{sig.name}</span>
+                                            <span className={styles.labelText}>
+                                                {sig.name}
+                                            </span>
                                         )}
                                     </div>
 
@@ -554,6 +688,7 @@ const WaveformCanvas: React.FC = () => {
                         onMouseMove={handleWaveOverlayMouseMove}
                         onMouseUp={handleWaveOverlayMouseUp}
                         onMouseLeave={handleWaveOverlayMouseLeave}
+                        onDoubleClick={handleWaveOverlayDoubleClick}
                     />
                 )}
 
@@ -660,6 +795,128 @@ const WaveformCanvas: React.FC = () => {
                     >
                         削除 (Delete)
                     </div>
+                </div>
+            )}
+
+            {/* ツールメニュー (右クリック) */}
+            {toolMenu && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: toolMenu.y,
+                        left: toolMenu.x,
+                        zIndex: 1001,
+                    }}
+                    onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }}
+                >
+                    {/* 中心（何もしない領域） */}
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: -20,
+                            left: -20,
+                            width: 40,
+                            height: 40,
+                            borderRadius: '50%',
+                            background: 'transparent',
+                            zIndex: 1002,
+                        }}
+                        onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }}
+                    />
+                    {RADIAL_TOOLS.map((tool, index) => {
+                        const sliceAngle = 360 / RADIAL_TOOLS.length;
+                        const startAngle = index * sliceAngle - sliceAngle / 2;
+                        const endAngle = startAngle + sliceAngle;
+
+                        // SVGの扇形（円環の一部）を描画するためのパス計算
+                        const innerRadius = 20;
+                        const outerRadius = 80;
+
+                        const startRad = (startAngle - 90) * (Math.PI / 180);
+                        const endRad = (endAngle - 90) * (Math.PI / 180);
+
+                        const x1 = Math.cos(startRad) * outerRadius;
+                        const y1 = Math.sin(startRad) * outerRadius;
+                        const x2 = Math.cos(endRad) * outerRadius;
+                        const y2 = Math.sin(endRad) * outerRadius;
+
+                        const x3 = Math.cos(endRad) * innerRadius;
+                        const y3 = Math.sin(endRad) * innerRadius;
+                        const x4 = Math.cos(startRad) * innerRadius;
+                        const y4 = Math.sin(startRad) * innerRadius;
+
+                        const largeArcFlag = sliceAngle > 180 ? 1 : 0;
+
+                        const pathData = [
+                            `M ${x1} ${y1}`,
+                            `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+                            `L ${x3} ${y3}`,
+                            `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${x4} ${y4}`,
+                            'Z'
+                        ].join(' ');
+
+                        // アイコンの配置位置（扇形の中心付近）
+                        const midRad = (startAngle + sliceAngle / 2 - 90) * (Math.PI / 180);
+                        const iconRadius = (innerRadius + outerRadius) / 2;
+                        const iconX = Math.cos(midRad) * iconRadius;
+                        const iconY = Math.sin(midRad) * iconRadius;
+
+                        const isHovered = hoveredTool === tool.key;
+                        const isSelected = selectedTool === tool.key;
+
+                        return (
+                            <div key={tool.key} style={{ position: 'absolute', top: 0, left: 0 }}>
+                                <svg
+                                    style={{
+                                        position: 'absolute',
+                                        top: -outerRadius,
+                                        left: -outerRadius,
+                                        width: outerRadius * 2,
+                                        height: outerRadius * 2,
+                                        overflow: 'visible',
+                                        pointerEvents: 'none',
+                                    }}
+                                >
+                                    <path
+                                        d={pathData}
+                                        fill={isHovered ? '#4a9df0' : (isSelected ? '#3a7dc0' : '#2a2a4a')}
+                                        stroke="#1a1a2a"
+                                        strokeWidth="2"
+                                        style={{
+                                            transform: `translate(${outerRadius}px, ${outerRadius}px)`,
+                                            transition: 'fill 0.1s',
+                                            opacity: 0.9
+                                        }}
+                                    />
+                                </svg>
+                                <div
+                                    style={{
+                                        position: 'absolute',
+                                        top: iconY - 12,
+                                        left: iconX - 12,
+                                        width: 24,
+                                        height: 24,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: isHovered || isSelected ? '#ffffff' : '#a0a0b0',
+                                        fontWeight: 'bold',
+                                        fontSize: '14px',
+                                        pointerEvents: 'none',
+                                        zIndex: 1003,
+                                    }}
+                                >
+                                    {tool.label}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>

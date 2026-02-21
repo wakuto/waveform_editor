@@ -39,6 +39,8 @@ const WaveRow: React.FC<WaveRowProps> = ({
     const beginDragEdit = useWaveformStore((s) => s.beginDragEdit);
     const setHoverInfo = useWaveformStore((s) => s.setHoverInfo);
     const setDataLabel = useWaveformStore((s) => s.setDataLabel);
+    const editingDataCell = useWaveformStore((s) => s.editingDataCell);
+    const setEditingDataCell = useWaveformStore((s) => s.setEditingDataCell);
 
     const dataIndexMap = buildDataIndexMap(wave);
     const isDragging = useRef(false);
@@ -47,9 +49,20 @@ const WaveRow: React.FC<WaveRowProps> = ({
     const [isDraggingState, setIsDraggingState] = useState(false);
     const [dragCurrentStep, setDragCurrentStep] = useState<number | null>(null);
     // ラベルインライン編集用 state
-    const [editingDataStep, setEditingDataStep] = useState<number | null>(null);
     const [editingLabel, setEditingLabel] = useState('');
     const editInputRef = useRef<HTMLInputElement>(null);
+
+    const isEditingThisRow = editingDataCell?.signalIndex === signalIndex;
+    const editingDataStep = isEditingThisRow ? editingDataCell.stepIndex : null;
+
+    // 外部から編集状態になったときにラベルを初期化
+    useEffect(() => {
+        if (isEditingThisRow && editingDataStep !== null) {
+            const di = dataIndexMap.get(editingDataStep) ?? 0;
+            setEditingLabel(data?.[di] ?? '');
+            setTimeout(() => editInputRef.current?.select(), 0);
+        }
+    }, [isEditingThisRow, editingDataStep, dataIndexMap, data]);
 
     const getCellIndex = useCallback((e: React.MouseEvent<SVGElement>) => {
         const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
@@ -105,20 +118,6 @@ const WaveRow: React.FC<WaveRowProps> = ({
         // ドラッグ中は isDragging を維持（window mouseup で終了）
     }, [setHoverInfo]);
 
-    /** '.' を後ろ向きに解決して、その波形の起源となるデータセルのインデックスを返す */
-    const resolveDataSrcStep = useCallback(
-        (stepIndex: number): number | null => {
-            const resolved = resolveWave(wave);
-            const rch = resolved[stepIndex];
-            if (!rch || (rch !== '=' && (rch < '2' || rch > '9'))) return null;
-            // '.' を遡って元のデータセルを探す
-            let src = stepIndex;
-            while (src > 0 && wave[src] === '.') src--;
-            return src;
-        },
-        [wave]
-    );
-
     /** データセルとその後継続する '.' の合計セル数を返す */
     const getDataSpan = useCallback(
         (srcStep: number): number => {
@@ -130,52 +129,33 @@ const WaveRow: React.FC<WaveRowProps> = ({
         [wave]
     );
 
-    /** インライン編集を開く */
-    const openLabelEdit = useCallback(
-        (stepIndex: number) => {
-            const src = resolveDataSrcStep(stepIndex);
-            if (src === null) return;
-            const di = dataIndexMap.get(src) ?? 0;
-            setEditingDataStep(src);
-            setEditingLabel(data?.[di] ?? '');
-            // 次フレームで autoFocus が効くよう setTimeout
-            setTimeout(() => editInputRef.current?.select(), 0);
-        },
-        [resolveDataSrcStep, dataIndexMap, data]
-    );
-
     /** インライン編集を確定する */
     const commitLabelEdit = useCallback(() => {
         if (editingDataStep !== null) {
             setDataLabel(signalIndex, editingDataStep, editingLabel);
-            setEditingDataStep(null);
+            setEditingDataCell(null);
         }
-    }, [editingDataStep, editingLabel, signalIndex, setDataLabel]);
+    }, [editingDataStep, editingLabel, signalIndex, setDataLabel, setEditingDataCell]);
 
     /** インライン編集をキャンセルする */
     const cancelLabelEdit = useCallback(() => {
-        setEditingDataStep(null);
-    }, []);
+        setEditingDataCell(null);
+    }, [setEditingDataCell]);
 
     const handleDoubleClick = useCallback(
         (_e: React.MouseEvent<SVGRectElement>, stepIndex: number) => {
-            openLabelEdit(stepIndex);
+            if (isSelectMode) {
+                useWaveformStore.getState().openDataLabelEdit(signalIndex, stepIndex);
+            }
         },
-        [openLabelEdit]
+        [isSelectMode, signalIndex]
     );
 
     const handleContextMenu = useCallback(
-        (e: React.MouseEvent<SVGRectElement>, stepIndex: number) => {
-            const resolved = resolveWave(wave);
-            const rch = resolved[stepIndex];
-            // データセルの右クリック → ラベル編集（親の contextMenu への伝播を止める）
-            if (rch === '=' || (rch >= '2' && rch <= '9')) {
-                e.preventDefault();
-                e.stopPropagation();
-                openLabelEdit(stepIndex);
-            }
+        (e: React.MouseEvent<SVGRectElement>, _stepIndex: number) => {
+            // 右クリックメニューは WaveformCanvas 側で処理するため、ここでは何もしない
         },
-        [wave, openLabelEdit]
+        []
     );
 
     const totalWidth = wave.length * CELL_WIDTH;

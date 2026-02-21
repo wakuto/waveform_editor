@@ -287,3 +287,34 @@
     background: transparent;
     color: #666;
 }
+
+/* ─── ツールメニュー ──────────────────────────────────── */
+.toolMenuItem {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: #1e2a4a;
+    border: 1px solid #2a2a4a;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.1s;
+}
+
+.toolMenuItem:hover {
+    background: #4a9df0;
+    border-color: #4a9df0;
+    color: #fff;
+}
+
+.toolMenuItemSelected {
+    background: #4a9df0;
+    border-color: #4a9df0;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(74, 157, 240, 0.5);
+}

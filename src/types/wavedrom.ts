@@ -76,6 +76,7 @@ export interface AppState {
     selectedSignalIndex: number | null;
     jsonPanelVisible: boolean;
     hoverInfo: { signalIndex: number; stepIndex: number } | null;
+    editingDataCell: { signalIndex: number; stepIndex: number } | null;
     statusMessage: string;
     /** 挿入カーソル位置（サイクル境界インデックス: 0〜N） */
     insertCursor: number | null;
