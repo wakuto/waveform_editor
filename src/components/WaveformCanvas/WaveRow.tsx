@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
     CELL_WIDTH,
     ROW_HEIGHT,
@@ -40,6 +40,8 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
     const handleMouseDown = useCallback(
         (e: React.MouseEvent<SVGRectElement>, stepIndex: number) => {
             if (e.button !== 0) return;
+            // ブラウザのネイティブドラッグを防止
+            e.preventDefault();
             isDragging.current = true;
             dragStart.current = stepIndex;
             setCell(signalIndex, stepIndex, selectedTool);
@@ -58,15 +60,20 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
         [signalIndex, selectedTool, getCellIndex, setHoverInfo, setCellRange]
     );
 
-    const handleMouseUp = useCallback(() => {
+    const stopDrag = useCallback(() => {
         isDragging.current = false;
         dragStart.current = null;
     }, []);
 
+    // SVG 外でマウスボタンを離したときもドラッグを終了させる
+    useEffect(() => {
+        window.addEventListener('mouseup', stopDrag);
+        return () => window.removeEventListener('mouseup', stopDrag);
+    }, [stopDrag]);
+
     const handleMouseLeave = useCallback(() => {
-        isDragging.current = false;
-        dragStart.current = null;
         setHoverInfo(null);
+        // ドラッグ中は isDragging を維持（window mouseup で終了）
     }, [setHoverInfo]);
 
     const handleDoubleClick = useCallback(
@@ -175,8 +182,8 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
             height={ROW_HEIGHT}
             className={styles.waveRow}
             onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
+            onDragStart={(e) => e.preventDefault()}
         >
             {/* グリッドライン */}
             {Array.from({ length: wave.length + 1 }, (_, i) => (

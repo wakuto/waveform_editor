@@ -103,17 +103,17 @@ const WaveformCanvas: React.FC = () => {
                         className={`${styles.row} ${selectedSignalIndex === idx ? styles.selected : ''} ${dragOver === idx ? styles.dragOver : ''}`}
                         style={{ height: ROW_HEIGHT }}
                         onClick={() => setSelectedSignalIndex(idx)}
-                        draggable
-                        onDragStart={() => handleDragStart(idx)}
                         onDragOver={(e) => handleDragOver(e, idx)}
                         onDrop={() => handleDrop(idx)}
                         onDragLeave={() => setDragOver(null)}
                         onContextMenu={(e) => handleContextMenu(e, idx)}
                     >
-                        {/* 信号ラベル */}
+                        {/* 信号ラベル（ここだけドラッグ可） */}
                         <div
                             className={styles.label}
                             style={{ width: LABEL_WIDTH, minWidth: LABEL_WIDTH }}
+                            draggable
+                            onDragStart={() => handleDragStart(idx)}
                             onDoubleClick={() => handleLabelDoubleClick(idx, sig.name)}
                         >
                             {editingIndex === idx ? (

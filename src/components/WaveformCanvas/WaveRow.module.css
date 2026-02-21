@@ -1,6 +1,8 @@
 .waveRow {
     display: block;
     overflow: visible;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .hovered path,
