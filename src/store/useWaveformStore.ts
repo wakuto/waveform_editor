@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WaveDromData, WaveSignal, WaveTool, AppState, StepClipboard } from '../types/wavedrom';
+import type { WaveDromData, WaveSignal, WaveTool, AppState, StepClipboard, WaveGroup, WaveSignalOrGroup } from '../types/wavedrom';
 import { DEFAULT_WAVEFORM } from '../types/wavedrom';
 import { isWaveSignal, getSignalList } from '../utils/waveformUtils';
 
@@ -21,6 +21,12 @@ interface WaveformStore extends AppState {
     removeSignal: (index: number) => void;
     renameSignal: (index: number, name: string) => void;
     moveSignal: (fromIndex: number, toIndex: number) => void;
+    moveItem: (fromPath: number[], toPath: number[]) => void;
+
+    // グループ管理
+    addGroup: (name: string) => void;
+    removeGroup: (groupIndex: number) => void;
+    renameGroup: (groupIndex: number, name: string) => void;
 
     // タイムステップ管理（レガシー: 末尾増減）
     addTimeStep: () => void;
@@ -163,7 +169,7 @@ function copyStepsFromSignal(sig: WaveSignal, from: number, to: number): { wave:
         }
     }
 
-    let data = sig.data ? sig.data.slice(dataStart, dataStart + dataCount) : [];
+    const data = sig.data ? sig.data.slice(dataStart, dataStart + dataCount) : [];
 
     // 先頭が '.' の場合、直前の有効な状態を解決する
     if (waveSlice.startsWith('.')) {
@@ -232,7 +238,7 @@ function pasteStepsIntoSignal(sig: WaveSignal, position: number, clipWave: strin
 
     // ペーストする波形の先頭が解決済みの値で、かつペースト先の直前の状態と同じ場合は '.' に戻す
     let finalClipWave = clipWave;
-    let finalClipData = clipData ? [...clipData] : [];
+    const finalClipData = clipData ? [...clipData] : [];
 
     if (clipWave.length > 0 && clipWave[0] !== '.' && clipWave[0] !== '|') {
         const firstChar = clipWave[0];
@@ -277,7 +283,7 @@ function pasteStepsIntoSignal(sig: WaveSignal, position: number, clipWave: strin
 
     // ペースト先の波形が '.' で始まっている場合、ペーストによってその '.' が意図しない状態を継続してしまうのを防ぐ
     let targetWave = wave;
-    let targetData = sig.data ? [...sig.data] : [];
+    const targetData = sig.data ? [...sig.data] : [];
     if (position < targetWave.length && targetWave[position] === '.') {
         // ペースト先の元の状態 (prevChar) と、ペーストする波形の最後の状態 (clipLastChar) が異なる場合、
         // ペースト先の '.' を元の状態 (prevChar) に置き換える
@@ -290,7 +296,7 @@ function pasteStepsIntoSignal(sig: WaveSignal, position: number, clipWave: strin
     }
 
     let newWave = targetWave.slice(0, position) + finalClipWave + targetWave.slice(position);
-    let data = targetData;
+    const data = targetData;
     if (finalClipData && finalClipData.length > 0) {
         data.splice(dataCountBefore, 0, ...finalClipData);
     }
@@ -540,6 +546,79 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             return { waveformData: newData, ...pushHistory(state, prev) };
         }),
 
+    addGroup: (name) =>
+        set((state) => {
+            const prev = state.waveformData;
+            const newGroup: WaveGroup = [name];
+            const newSignals = [...prev.signal, newGroup];
+            const newData = { ...prev, signal: newSignals };
+            return { waveformData: newData, ...pushHistory(state, prev) };
+        }),
+
+    removeGroup: (groupIndex) =>
+        set((state) => {
+            const prev = state.waveformData;
+            let currentGroupIndex = 0;
+            let removed = false;
+
+            const filterGroups = (items: WaveSignalOrGroup[]): WaveSignalOrGroup[] => {
+                const result: WaveSignalOrGroup[] = [];
+                for (const item of items) {
+                    if (Array.isArray(item)) {
+                        const isTarget = currentGroupIndex === groupIndex;
+                        currentGroupIndex++;
+
+                        if (isTarget) {
+                            removed = true;
+                            continue;
+                        }
+
+                        const [groupName, ...children] = item;
+                        result.push([groupName, ...filterGroups(children)] as WaveGroup);
+                    } else {
+                        result.push(item);
+                    }
+                }
+                return result;
+            };
+
+            const newSignals = filterGroups(prev.signal);
+            if (!removed) return {};
+            const newData = { ...prev, signal: newSignals };
+            return { waveformData: newData, ...pushHistory(state, prev) };
+        }),
+
+    renameGroup: (groupIndex, name) =>
+        set((state) => {
+            const prev = state.waveformData;
+            let currentGroupIndex = 0;
+            let renamed = false;
+
+            const mapGroups = (items: WaveSignalOrGroup[]): WaveSignalOrGroup[] => {
+                return items.map((item) => {
+                    if (Array.isArray(item)) {
+                        const isTarget = currentGroupIndex === groupIndex;
+                        currentGroupIndex++;
+
+                        const [groupName, ...children] = item;
+                        const mappedChildren = mapGroups(children);
+
+                        if (isTarget) {
+                            renamed = true;
+                            return [name, ...mappedChildren] as WaveGroup;
+                        }
+                        return [groupName, ...mappedChildren] as WaveGroup;
+                    }
+                    return item;
+                });
+            };
+
+            const newSignals = mapGroups(prev.signal);
+            if (!renamed) return {};
+            const newData = { ...prev, signal: newSignals };
+            return { waveformData: newData, ...pushHistory(state, prev) };
+        }),
+
     moveSignal: (fromIndex, toIndex) =>
         set((state) => {
             const prev = state.waveformData;
@@ -551,6 +630,50 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const newSignals = [...prev.signal.filter(isWaveSignal)];
             const [moved] = newSignals.splice(fromIndex, 1);
             newSignals.splice(toIndex, 0, moved);
+            const newData = { ...prev, signal: newSignals };
+            return { waveformData: newData, ...pushHistory(state, prev) };
+        }),
+
+    moveItem: (fromPath, toPath) =>
+        set((state) => {
+            const prev = state.waveformData;
+            if (fromPath.join(',') === toPath.join(',')) return {};
+
+            // toPath が fromPath の子孫である場合は移動できない
+            if (toPath.length > fromPath.length && toPath.slice(0, fromPath.length).join(',') === fromPath.join(',')) {
+                return {};
+            }
+
+            const newSignals = JSON.parse(JSON.stringify(prev.signal)) as WaveSignalOrGroup[];
+
+            const getArrayAndIndex = (signals: WaveSignalOrGroup[], path: number[]) => {
+                let currentArray: WaveSignalOrGroup[] = signals;
+                for (let i = 0; i < path.length - 1; i++) {
+                    const next = currentArray[path[i]];
+                    if (!Array.isArray(next)) return null;
+                    currentArray = next as unknown as WaveSignalOrGroup[];
+                }
+                return { array: currentArray, index: path[path.length - 1] };
+            };
+
+            const fromInfo = getArrayAndIndex(newSignals, fromPath);
+            if (!fromInfo) return {};
+            const [movedItem] = fromInfo.array.splice(fromInfo.index, 1);
+
+            const adjustedToPath = [...toPath];
+            const fromParentPath = fromPath.slice(0, -1);
+            const toParentPath = toPath.slice(0, fromParentPath.length);
+
+            if (fromParentPath.join(',') === toParentPath.join(',')) {
+                if (fromPath[fromPath.length - 1] < toPath[fromParentPath.length]) {
+                    adjustedToPath[fromParentPath.length]--;
+                }
+            }
+
+            const toInfo = getArrayAndIndex(newSignals, adjustedToPath);
+            if (!toInfo) return {};
+            toInfo.array.splice(toInfo.index, 0, movedItem);
+
             const newData = { ...prev, signal: newSignals };
             return { waveformData: newData, ...pushHistory(state, prev) };
         }),

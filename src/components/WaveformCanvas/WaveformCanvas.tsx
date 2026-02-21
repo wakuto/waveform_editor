@@ -27,7 +27,9 @@ const WaveformCanvas: React.FC = () => {
     const addSignal = useWaveformStore((s) => s.addSignal);
     const removeSignal = useWaveformStore((s) => s.removeSignal);
     const renameSignal = useWaveformStore((s) => s.renameSignal);
-    const moveSignal = useWaveformStore((s) => s.moveSignal);
+    const moveItem = useWaveformStore((s) => s.moveItem);
+
+    const addGroup = useWaveformStore((s) => s.addGroup);
 
     // 選択ツール state
     const insertCursor = useWaveformStore((s) => s.insertCursor);
@@ -39,8 +41,23 @@ const WaveformCanvas: React.FC = () => {
 
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editingName, setEditingName] = useState('');
-    const [dragOver, setDragOver] = useState<number | null>(null);
-    const dragIndexRef = useRef<number | null>(null);
+    const [editingGroupIndex, setEditingGroupIndex] = useState<number | null>(null);
+    const [editingGroupName, setEditingGroupName] = useState('');
+    const [dragOver, setDragOver] = useState<string | null>(null);
+    const dragPathRef = useRef<number[] | null>(null);
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+    const toggleGroupCollapse = useCallback((pathStr: string) => {
+        setCollapsedGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(pathStr)) {
+                next.delete(pathStr);
+            } else {
+                next.add(pathStr);
+            }
+            return next;
+        });
+    }, []);
 
     // ヘッダーホバー境界インデックス（プレビュー表示用）
     const [hoverBoundary, setHoverBoundary] = useState<number | null>(null);
@@ -70,6 +87,9 @@ const WaveformCanvas: React.FC = () => {
 
     const handleLabelKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
+            // 日本語入力中のEnterキーは無視する
+            if (e.nativeEvent.isComposing) return;
+
             if (e.key === 'Enter') handleLabelBlur();
             if (e.key === 'Escape') setEditingIndex(null);
         },
@@ -77,18 +97,23 @@ const WaveformCanvas: React.FC = () => {
     );
 
     // ─── 信号ドラッグ並べ替え ────────────────────────────────────────
-    const handleDragStart = useCallback((index: number) => { dragIndexRef.current = index; }, []);
-    const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
-        e.preventDefault(); setDragOver(index);
+    const handleDragStart = useCallback((path: number[]) => { dragPathRef.current = path; }, []);
+    const handleDragOver = useCallback((e: React.DragEvent, path: number[]) => {
+        e.preventDefault();
+        if (path.length === 1 && path[0] === -1) {
+            setDragOver('root');
+        } else {
+            setDragOver(path.join(','));
+        }
     }, []);
     const handleDrop = useCallback(
-        (toIndex: number) => {
-            if (dragIndexRef.current !== null && dragIndexRef.current !== toIndex) {
-                moveSignal(dragIndexRef.current, toIndex);
+        (toPath: number[]) => {
+            if (dragPathRef.current !== null && dragPathRef.current.join(',') !== toPath.join(',')) {
+                moveItem(dragPathRef.current, toPath);
             }
-            dragIndexRef.current = null; setDragOver(null);
+            dragPathRef.current = null; setDragOver(null);
         },
-        [moveSignal]
+        [moveItem]
     );
 
     const handleContextMenu = useCallback(
@@ -97,6 +122,51 @@ const WaveformCanvas: React.FC = () => {
             if (window.confirm(`信号 "${signals[index].name}" を削除しますか？`)) removeSignal(index);
         },
         [signals, removeSignal]
+    );
+
+    const handleGroupContextMenu = useCallback(
+        (e: React.MouseEvent, groupIndex: number, groupName: string) => {
+            e.preventDefault();
+            // 編集中の場合はコンテキストメニューを出さない
+            if (editingGroupIndex === groupIndex) return;
+            if (window.confirm(`グループ "${groupName}" を削除しますか？`)) {
+                const removeGroup = useWaveformStore.getState().removeGroup;
+                if (removeGroup) removeGroup(groupIndex);
+            }
+        },
+        [editingGroupIndex]
+    );
+
+    const handleGroupDoubleClick = useCallback(
+        (groupIndex: number, groupName: string) => {
+            setEditingGroupIndex(groupIndex);
+            setEditingGroupName(groupName);
+        },
+        []
+    );
+
+    const handleGroupLabelBlur = useCallback(() => {
+        if (editingGroupIndex !== null) {
+            const renameGroup = useWaveformStore.getState().renameGroup;
+            if (renameGroup && editingGroupName.trim() !== '') {
+                renameGroup(editingGroupIndex, editingGroupName.trim());
+            }
+            setEditingGroupIndex(null);
+        }
+    }, [editingGroupIndex, editingGroupName]);
+
+    const handleGroupLabelKeyDown = useCallback(
+        (e: React.KeyboardEvent<HTMLInputElement>) => {
+            // 日本語入力中のEnterキーは無視する
+            if (e.nativeEvent.isComposing) return;
+
+            if (e.key === 'Enter') {
+                handleGroupLabelBlur();
+            } else if (e.key === 'Escape') {
+                setEditingGroupIndex(null);
+            }
+        },
+        [handleGroupLabelBlur]
     );
 
     // ─── ヘッダーのマウス操作（選択モード） ──────────────────────────
@@ -153,6 +223,49 @@ const WaveformCanvas: React.FC = () => {
 
     // ─── 波形エリアオーバーレイの操作（選択モードのみ） ───────────────
 
+    const { totalRowsHeight, getSignalIndexFromY } = React.useMemo(() => {
+        let currentY = 0;
+        const rowMap: { y: number; height: number; signalIndex: number | null }[] = [];
+        let flatIndex = 0;
+
+        const traverse = (items: import('../../types/wavedrom').WaveSignalOrGroup[], path: number[]) => {
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const currentPath = [...path, i];
+                const pathStr = currentPath.join(',');
+
+                if (Array.isArray(item)) {
+                    rowMap.push({ y: currentY, height: 24, signalIndex: null });
+                    currentY += 24;
+                    if (!collapsedGroups.has(pathStr)) {
+                        const [, ...children] = item;
+                        traverse(children, currentPath);
+                    }
+                } else if (item && typeof (item as import('../../types/wavedrom').WaveSignal).wave === 'string') {
+                    rowMap.push({ y: currentY, height: ROW_HEIGHT, signalIndex: flatIndex });
+                    currentY += ROW_HEIGHT;
+                    flatIndex++;
+                }
+            }
+        };
+        traverse(waveformData.signal, []);
+
+        const getIndex = (relY: number) => {
+            let lastValidIndex = 0;
+            for (const row of rowMap) {
+                if (row.signalIndex !== null) {
+                    lastValidIndex = row.signalIndex;
+                }
+                if (relY >= row.y && relY < row.y + row.height) {
+                    return row.signalIndex !== null ? row.signalIndex : lastValidIndex;
+                }
+            }
+            return lastValidIndex;
+        };
+
+        return { totalRowsHeight: currentY, getSignalIndexFromY: getIndex };
+    }, [waveformData.signal, collapsedGroups]);
+
     const handleWaveOverlayMouseDown = useCallback(
         (e: React.MouseEvent<HTMLDivElement>) => {
             if (e.button !== 0) return;
@@ -162,7 +275,7 @@ const WaveformCanvas: React.FC = () => {
             const relY = e.clientY - rect.top;
 
             // クリックした行（信号インデックス）を計算
-            const signalIndex = Math.max(0, Math.min(Math.floor(relY / ROW_HEIGHT), signals.length - 1));
+            const signalIndex = getSignalIndexFromY(relY);
             setSelectedSignalIndex(signalIndex);
 
             if (isNearBoundary(relX)) {
@@ -178,7 +291,7 @@ const WaveformCanvas: React.FC = () => {
                 setStepSelection({ from: cycle, to: cycle, signalIndex });
             }
         },
-        [maxLen, setInsertCursor, signals.length, setSelectedSignalIndex, setStepSelection]
+        [maxLen, setInsertCursor, setSelectedSignalIndex, setStepSelection, getSignalIndexFromY]
     );
 
     const handleWaveOverlayMouseMove = useCallback(
@@ -193,14 +306,14 @@ const WaveformCanvas: React.FC = () => {
             if (!isSelectDragging.current || selectDragStartCycle.current === null) return;
 
             const cycle = Math.max(0, Math.min(Math.floor(relX / CELL_WIDTH), maxLen - 1));
-            const signalIndex = Math.max(0, Math.min(Math.floor(relY / ROW_HEIGHT), signals.length - 1));
+            const signalIndex = getSignalIndexFromY(relY);
 
             // ドラッグで範囲選択（単一信号選択）
             const from = Math.min(selectDragStartCycle.current, cycle);
             const to = Math.max(selectDragStartCycle.current, cycle);
             setStepSelection({ from, to, signalIndex });
         },
-        [maxLen, signals.length, setStepSelection]
+        [maxLen, setStepSelection, getSignalIndexFromY]
     );
 
     const handleWaveOverlayMouseUp = useCallback(() => {
@@ -215,7 +328,6 @@ const WaveformCanvas: React.FC = () => {
     }, []);
 
     const totalWaveWidth = maxLen * CELL_WIDTH;
-    const totalRowsHeight = signals.length * ROW_HEIGHT;
 
     return (
         <div className={styles.canvas}>
@@ -276,53 +388,142 @@ const WaveformCanvas: React.FC = () => {
 
             {/* 信号行 + オーバーレイ */}
             <div className={styles.rows} style={{ position: 'relative' }}>
-                {signals.map((sig, idx) => (
-                    <div
-                        key={idx}
-                        className={`${styles.row} ${selectedSignalIndex === idx ? styles.selected : ''} ${dragOver === idx ? styles.dragOver : ''}`}
-                        style={{ height: ROW_HEIGHT }}
-                        onClick={() => setSelectedSignalIndex(idx)}
-                        onDragOver={(e) => handleDragOver(e, idx)}
-                        onDrop={() => handleDrop(idx)}
-                        onDragLeave={() => setDragOver(null)}
-                        onContextMenu={(e) => handleContextMenu(e, idx)}
-                    >
-                        {/* 信号ラベル */}
-                        <div
-                            className={styles.label}
-                            style={{ width: LABEL_WIDTH, minWidth: LABEL_WIDTH }}
-                            draggable
-                            onDragStart={() => handleDragStart(idx)}
-                            onDoubleClick={() => handleLabelDoubleClick(idx, sig.name)}
-                        >
-                            {editingIndex === idx ? (
-                                <input
-                                    className={styles.labelInput}
-                                    value={editingName}
-                                    onChange={(e) => setEditingName(e.target.value)}
-                                    onBlur={handleLabelBlur}
-                                    onKeyDown={handleLabelKeyDown}
-                                    autoFocus
-                                />
-                            ) : (
-                                <span className={styles.labelText}>{sig.name}</span>
-                            )}
-                        </div>
+                {(() => {
+                    let flatIndex = 0;
+                    let groupIndex = 0;
+                    const renderSignalOrGroup = (item: import('../../types/wavedrom').WaveSignalOrGroup, path: number[], depth: number = 0): React.ReactNode => {
+                        if (Array.isArray(item)) {
+                            const [groupName, ...children] = item;
+                            const currentGroupIndex = groupIndex++;
+                            const pathStr = path.join(',');
+                            return (
+                                <div key={`group-${currentGroupIndex}`} className={styles.groupContainer}>
+                                    <div
+                                        className={`${styles.groupHeader} ${dragOver === pathStr ? styles.groupHeaderDragOver : ''}`}
+                                        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.stopPropagation();
+                                            handleDragStart(path);
+                                        }}
+                                        onDragOver={(e) => handleDragOver(e, path)}
+                                        onDrop={(e) => {
+                                            e.stopPropagation();
+                                            // グループにドロップした場合は、そのグループの末尾に追加する
+                                            handleDrop([...path, children.length + 1]);
+                                        }}
+                                        onDragLeave={() => setDragOver(null)}
+                                        onDoubleClick={() => handleGroupDoubleClick(currentGroupIndex, groupName)}
+                                        onContextMenu={(e) => handleGroupContextMenu(e, currentGroupIndex, groupName)}
+                                    >
+                                        {/* ネストの深さに応じたインジケーター */}
+                                        {Array.from({ length: depth }).map((_, i) => (
+                                            <div
+                                                key={`depth-${i}`}
+                                                className={styles.labelDepthIndicator}
+                                                style={{ left: `${i * 12 + 8}px` }}
+                                            />
+                                        ))}
+                                        <span
+                                            className={styles.groupIcon}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleGroupCollapse(pathStr);
+                                            }}
+                                        >
+                                            {collapsedGroups.has(pathStr) ? '▶' : '▼'}
+                                        </span>
+                                        {editingGroupIndex === currentGroupIndex ? (
+                                            <input
+                                                className={styles.groupNameInput}
+                                                value={editingGroupName}
+                                                onChange={(e) => setEditingGroupName(e.target.value)}
+                                                onBlur={handleGroupLabelBlur}
+                                                onKeyDown={handleGroupLabelKeyDown}
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <span className={styles.groupName}>{groupName}</span>
+                                        )}
+                                    </div>
+                                    {!collapsedGroups.has(pathStr) && (
+                                        <div className={styles.groupChildren}>
+                                            {children.map((child, i) => renderSignalOrGroup(child, [...path, i + 1], depth + 1))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        } else if (item && typeof (item as import('../../types/wavedrom').WaveSignal).wave === 'string') {
+                            const sig = item as import('../../types/wavedrom').WaveSignal;
+                            const idx = flatIndex++;
+                            const pathStr = path.join(',');
+                            return (
+                                <div
+                                    key={`sig-${idx}`}
+                                    className={`${styles.row} ${depth > 0 ? styles.rowInGroup : ''} ${selectedSignalIndex === idx ? styles.selected : ''} ${dragOver === pathStr ? styles.dragOver : ''}`}
+                                    style={{ height: ROW_HEIGHT }}
+                                    onClick={() => setSelectedSignalIndex(idx)}
+                                    onDragOver={(e) => handleDragOver(e, path)}
+                                    onDrop={(e) => {
+                                        e.stopPropagation();
+                                        handleDrop(path);
+                                    }}
+                                    onDragLeave={() => setDragOver(null)}
+                                    onContextMenu={(e) => handleContextMenu(e, idx)}
+                                >
+                                    {/* 信号ラベル */}
+                                    <div
+                                        className={`${styles.label} ${depth > 0 ? styles.labelInGroup : ''}`}
+                                        style={{ width: LABEL_WIDTH, minWidth: LABEL_WIDTH, paddingLeft: `${depth * 12 + 8}px` }}
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.stopPropagation();
+                                            handleDragStart(path);
+                                        }}
+                                        onDoubleClick={() => handleLabelDoubleClick(idx, sig.name)}
+                                    >
+                                        {/* ネストの深さに応じたインジケーター */}
+                                        {Array.from({ length: depth }).map((_, i) => (
+                                            <div
+                                                key={`depth-${i}`}
+                                                className={styles.labelDepthIndicator}
+                                                style={{ left: `${i * 12 + 8}px` }}
+                                            />
+                                        ))}
+                                        {editingIndex === idx ? (
+                                            <input
+                                                className={styles.labelInput}
+                                                value={editingName}
+                                                onChange={(e) => setEditingName(e.target.value)}
+                                                onBlur={handleLabelBlur}
+                                                onKeyDown={handleLabelKeyDown}
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <span className={styles.labelText}>{sig.name}</span>
+                                        )}
+                                    </div>
 
-                        {/* 波形（挿入カーソル・選択オーバーレイも内部で描画） */}
-                        <div className={styles.waveArea}>
-                            <WaveRow
-                                signal={sig}
-                                signalIndex={idx}
-                                hoverStep={hoverInfo?.signalIndex === idx ? hoverInfo.stepIndex : null}
-                                insertCursor={insertCursor}
-                                stepSelection={stepSelection}
-                                isSelectMode={isSelectMode}
-                                hoverBoundary={hoverBoundary}
-                            />
-                        </div>
-                    </div>
-                ))}
+                                    {/* 波形（挿入カーソル・選択オーバーレイも内部で描画） */}
+                                    <div className={styles.waveArea}>
+                                        <WaveRow
+                                            signal={sig}
+                                            signalIndex={idx}
+                                            hoverStep={hoverInfo?.signalIndex === idx ? hoverInfo.stepIndex : null}
+                                            insertCursor={insertCursor}
+                                            stepSelection={stepSelection}
+                                            isSelectMode={isSelectMode}
+                                            hoverBoundary={hoverBoundary}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        }
+                        return null;
+                    };
+
+                    return waveformData.signal.map((item, i) => renderSignalOrGroup(item, [i], 0));
+                })()}
 
                 {/* 選択モード用透明オーバーレイ（波形エリア全体をカバー） */}
                 {isSelectMode && (
@@ -341,9 +542,39 @@ const WaveformCanvas: React.FC = () => {
                 )}
 
                 {/* 信号追加ボタン */}
-                <div className={styles.addRow}>
+                <div
+                    className={`${styles.addRow} ${dragOver === 'root' ? styles.dragOver : ''}`}
+                    onDragOver={(e) => handleDragOver(e, [-1])} // -1 はルートを示すダミー
+                    onDrop={(e) => {
+                        e.stopPropagation();
+                        handleDrop([waveformData.signal.length]);
+                    }}
+                    onDragLeave={() => setDragOver(null)}
+                >
                     <button className={styles.addButton} onClick={() => addSignal()}>
                         + 信号を追加
+                    </button>
+                    <button className={styles.addButton} onClick={() => {
+                        addGroup('New Group');
+                        // 新しく追加されたグループを編集状態にする
+                        // groupIndexは現在のグループ数になる
+                        let groupCount = 0;
+                        const countGroups = (items: import('../../types/wavedrom').WaveSignalOrGroup[]) => {
+                            items.forEach(item => {
+                                if (Array.isArray(item)) {
+                                    groupCount++;
+                                    countGroups(item.slice(1) as import('../../types/wavedrom').WaveSignalOrGroup[]);
+                                }
+                            });
+                        };
+                        countGroups(waveformData.signal);
+                        // setTimeoutを使って、レンダリング後にフォーカスが当たるようにする
+                        setTimeout(() => {
+                            setEditingGroupIndex(groupCount);
+                            setEditingGroupName('New Group');
+                        }, 0);
+                    }} style={{ marginLeft: '8px' }}>
+                        + グループを追加
                     </button>
                 </div>
             </div>
