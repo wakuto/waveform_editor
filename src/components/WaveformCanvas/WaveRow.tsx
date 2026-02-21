@@ -60,11 +60,18 @@ const WaveRow: React.FC<WaveRowProps> = ({
     // 外部から編集状態になったときにラベルを初期化
     useEffect(() => {
         if (isEditingThisRow && editingDataStep !== null) {
-            const di = dataIndexMap.get(editingDataStep) ?? 0;
-            setEditingLabel(data?.[di] ?? '');
+            let dataIdx = 0;
+            for (let i = 0; i <= editingDataStep; i++) {
+                const ch = wave[i];
+                if (ch === '=' || (ch >= '2' && ch <= '9')) {
+                    if (i === editingDataStep) break;
+                    dataIdx++;
+                }
+            }
+            setEditingLabel(data?.[dataIdx] ?? '');
             setTimeout(() => editInputRef.current?.select(), 0);
         }
-    }, [isEditingThisRow, editingDataStep, dataIndexMap, data]);
+    }, [isEditingThisRow, editingDataStep, data, wave]);
 
     const getCellIndex = useCallback((e: React.MouseEvent<SVGElement>) => {
         const rect = (e.currentTarget as SVGElement).getBoundingClientRect();

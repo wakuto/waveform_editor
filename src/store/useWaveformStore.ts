@@ -909,6 +909,12 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
         let src = stepIndex;
         while (src > 0 && sig.wave[src] === '.') src--;
 
+        // src が | などの場合はさらに遡る必要があるかもしれないが、
+        // 基本的にデータセルの開始位置は = か 2~9
+        while (src > 0 && sig.wave[src] !== '=' && (sig.wave[src] < '2' || sig.wave[src] > '9')) {
+            src--;
+        }
+
         set({ editingDataCell: { signalIndex, stepIndex: src } });
     },
     setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(zoom, 5)) }),
