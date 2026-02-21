@@ -343,9 +343,17 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     setHoverInfo: (info) => set({ hoverInfo: info }),
 
     // ─── 挿入カーソル・選択ツール ─────────────────────────────────────
-    setInsertCursor: (boundary) => set({ insertCursor: boundary }),
+    // カーソルを設定したら選択範囲をクリア（排他）
+    setInsertCursor: (boundary) =>
+        set(boundary !== null
+            ? { insertCursor: boundary, stepSelection: null }
+            : { insertCursor: null }),
 
-    setStepSelection: (selection) => set({ stepSelection: selection }),
+    // 選択範囲を設定したらカーソルをクリア（排他）
+    setStepSelection: (selection) =>
+        set(selection !== null
+            ? { stepSelection: selection, insertCursor: null }
+            : { stepSelection: null }),
 
     insertStepsAtCursor: (count = 1) =>
         set((state) => {

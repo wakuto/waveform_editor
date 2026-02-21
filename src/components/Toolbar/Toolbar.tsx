@@ -112,7 +112,7 @@ const Toolbar: React.FC = () => {
             {/* 選択ツール + 選択操作ボタン */}
             <div className={styles.group}>
                 <button
-                    className={`${styles.toolBtn} ${isSelectMode ? styles.active : ''}`}
+                    className={`${styles.btn} ${isSelectMode ? styles.active : ''}`}
                     onClick={() => setSelectedTool('select')}
                     title="選択ツール (S)"
                 >
@@ -121,44 +121,44 @@ const Toolbar: React.FC = () => {
                 {isSelectMode && (
                     <>
                         <button
-                            className={styles.btn}
+                            className={styles.toolBtn}
                             onClick={() => insertStepsAtCursor()}
                             disabled={insertCursor === null}
                             title="カーソル位置にステップを挿入 (Insert)"
                         >
-                            ＋挿入
+                            ⊕
                         </button>
                         <button
-                            className={styles.btn}
+                            className={styles.toolBtn}
                             onClick={deleteSelectedSteps}
                             disabled={!stepSelection}
                             title="選択範囲を削除 (Delete)"
                         >
-                            削除
+                            ⊖
                         </button>
                         <button
-                            className={styles.btn}
+                            className={styles.toolBtn}
                             onClick={copySteps}
                             disabled={!stepSelection}
                             title="コピー (Ctrl+C)"
                         >
-                            コピー
+                            ⎘
                         </button>
                         <button
-                            className={styles.btn}
+                            className={styles.toolBtn}
                             onClick={cutSteps}
                             disabled={!stepSelection}
                             title="カット (Ctrl+X)"
                         >
-                            カット
+                            ✂
                         </button>
                         <button
-                            className={styles.btn}
+                            className={styles.toolBtn}
                             onClick={pasteAtCursor}
                             disabled={!stepClipboard || insertCursor === null}
                             title="ペースト (Ctrl+V)"
                         >
-                            ペースト
+                            ⎗
                         </button>
                     </>
                 )}

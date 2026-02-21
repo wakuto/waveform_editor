@@ -74,6 +74,11 @@
     color: #fff;
 }
 
+.toolBtn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
 .toolBtn.active {
     background: #4a9df0;
     border-color: #6ab8ff;
