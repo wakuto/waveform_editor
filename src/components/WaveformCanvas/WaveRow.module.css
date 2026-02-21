@@ -5,7 +5,28 @@
     -webkit-user-select: none;
 }
 
+/** ドラッグ操作中: カーソルをグラブ状に変更 */
+.dragging {
+    cursor: grabbing !important;
+}
+
+.dragging * {
+    cursor: grabbing !important;
+}
+
 .hovered path,
 .hovered line {
     filter: brightness(1.3);
+}
+
+/** ドラッグ開始セル（value が入るセル）: 波形を明るくする */
+.dragValue path,
+.dragValue line {
+    filter: brightness(1.5);
+}
+
+/** ドラッグ継続セル（'.' が入るセル）: 波形をやや明るくする */
+.dragContinue path,
+.dragContinue line {
+    filter: brightness(1.25);
 }

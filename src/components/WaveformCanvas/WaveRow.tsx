@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     CELL_WIDTH,
     ROW_HEIGHT,
@@ -23,13 +23,16 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
     const { wave, data } = signal;
     const selectedTool = useWaveformStore((s) => s.selectedTool);
     const setCell = useWaveformStore((s) => s.setCell);
-    const setCellRange = useWaveformStore((s) => s.setCellRange);
+    const setCellRangeWithContinue = useWaveformStore((s) => s.setCellRangeWithContinue);
     const setHoverInfo = useWaveformStore((s) => s.setHoverInfo);
     const setDataLabel = useWaveformStore((s) => s.setDataLabel);
 
     const dataIndexMap = buildDataIndexMap(wave);
     const isDragging = useRef(false);
     const dragStart = useRef<number | null>(null);
+    // ドラッグ中UIフィードバック用 state
+    const [isDraggingState, setIsDraggingState] = useState(false);
+    const [dragCurrentStep, setDragCurrentStep] = useState<number | null>(null);
 
     const getCellIndex = useCallback((e: React.MouseEvent<SVGElement>) => {
         const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
@@ -44,6 +47,8 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
             e.preventDefault();
             isDragging.current = true;
             dragStart.current = stepIndex;
+            setIsDraggingState(true);
+            setDragCurrentStep(stepIndex);
             setCell(signalIndex, stepIndex, selectedTool);
         },
         [signalIndex, selectedTool, setCell]
@@ -54,15 +59,18 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
             const step = getCellIndex(e);
             setHoverInfo({ signalIndex, stepIndex: step });
             if (isDragging.current && dragStart.current !== null) {
-                setCellRange(signalIndex, dragStart.current, step, selectedTool);
+                setDragCurrentStep(step);
+                setCellRangeWithContinue(signalIndex, dragStart.current, step, selectedTool);
             }
         },
-        [signalIndex, selectedTool, getCellIndex, setHoverInfo, setCellRange]
+        [signalIndex, selectedTool, getCellIndex, setHoverInfo, setCellRangeWithContinue]
     );
 
     const stopDrag = useCallback(() => {
         isDragging.current = false;
         dragStart.current = null;
+        setIsDraggingState(false);
+        setDragCurrentStep(null);
     }, []);
 
     // SVG 外でマウスボタンを離したときもドラッグを終了させる
@@ -97,6 +105,16 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
     // '.' を前の有効な状態に解決した配列（色・パス生成に使用）
     const resolved = resolveWave(wave);
 
+    // ドラッグ中の範囲を計算
+    const dragRange =
+        isDraggingState && dragStart.current !== null && dragCurrentStep !== null
+            ? {
+                from: Math.min(dragStart.current, dragCurrentStep),
+                to: Math.max(dragStart.current, dragCurrentStep),
+                valueStep: Math.min(dragStart.current, dragCurrentStep),
+            }
+            : null;
+
     const segments: React.ReactNode[] = [];
 
     for (let i = 0; i < wave.length; i++) {
@@ -112,8 +130,20 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
         const di = dataIndexMap.get(i);
         const label = di !== undefined ? (data?.[di] ?? '') : undefined;
 
+        // ドラッグ範囲内かどうか
+        const isInDragRange = dragRange !== null && i >= dragRange.from && i <= dragRange.to;
+        const isDragValueCell = dragRange !== null && i === dragRange.valueStep;
+
+        // g 要素のクラスを決定
+        const gClassName = [
+            isHovered ? styles.hovered : undefined,
+            isInDragRange ? (isDragValueCell ? styles.dragValue : styles.dragContinue) : undefined,
+        ]
+            .filter(Boolean)
+            .join(' ') || undefined;
+
         segments.push(
-            <g key={i} className={isHovered ? styles.hovered : undefined}>
+            <g key={i} className={gClassName}>
                 {/* ホバーハイライト背景 */}
                 {isHovered && (
                     <rect
@@ -122,6 +152,30 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
                         width={CELL_WIDTH}
                         height={ROW_HEIGHT}
                         fill="rgba(255,255,255,0.08)"
+                    />
+                )}
+
+                {/* ドラッグ中オーバーレイ: 開始セル（value セル）*/}
+                {isDragValueCell && (
+                    <rect
+                        x={x}
+                        y={0}
+                        width={CELL_WIDTH}
+                        height={ROW_HEIGHT}
+                        fill="rgba(255,200,50,0.38)"
+                        style={{ pointerEvents: 'none' }}
+                    />
+                )}
+
+                {/* ドラッグ中オーバーレイ: 継続セル */}
+                {isInDragRange && !isDragValueCell && (
+                    <rect
+                        x={x}
+                        y={0}
+                        width={CELL_WIDTH}
+                        height={ROW_HEIGHT}
+                        fill="rgba(255,200,50,0.18)"
+                        style={{ pointerEvents: 'none' }}
                     />
                 )}
 
@@ -180,7 +234,7 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
         <svg
             width={totalWidth}
             height={ROW_HEIGHT}
-            className={styles.waveRow}
+            className={`${styles.waveRow}${isDraggingState ? ` ${styles.dragging}` : ''}`}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             onDragStart={(e) => e.preventDefault()}

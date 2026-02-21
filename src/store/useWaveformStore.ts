@@ -10,6 +10,8 @@ interface WaveformStore extends AppState {
     setWaveformData: (data: WaveDromData, pushHistory?: boolean) => void;
     setCell: (signalIndex: number, stepIndex: number, value: string) => void;
     setCellRange: (signalIndex: number, startStep: number, endStep: number, value: string) => void;
+    /** ドラッグ挿入用: dragStartStep の位置に value を、残りのセルに '.' を設定 */
+    setCellRangeWithContinue: (signalIndex: number, dragStartStep: number, currentStep: number, value: string) => void;
     setDataLabel: (signalIndex: number, stepIndex: number, label: string) => void;
 
     // 信号管理
@@ -97,6 +99,22 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
                 const waveArr = sig.wave.split('');
                 while (waveArr.length <= to) waveArr.push('.');
                 for (let i = from; i <= to; i++) waveArr[i] = value;
+                return { ...sig, wave: waveArr.join('') };
+            });
+            return { waveformData: newData, ...pushHistory(state, prev) };
+        }),
+
+    setCellRangeWithContinue: (signalIndex, dragStartStep, currentStep, value) =>
+        set((state) => {
+            const prev = state.waveformData;
+            const from = Math.min(dragStartStep, currentStep);
+            const to = Math.max(dragStartStep, currentStep);
+            // 左端のセルだけ value、それ以降は継続 '.' を設定
+            const newData = updateFlatSignal(prev, signalIndex, (sig) => {
+                const waveArr = sig.wave.split('');
+                while (waveArr.length <= to) waveArr.push('.');
+                waveArr[from] = value;
+                for (let i = from + 1; i <= to; i++) waveArr[i] = '.';
                 return { ...sig, wave: waveArr.join('') };
             });
             return { waveformData: newData, ...pushHistory(state, prev) };
