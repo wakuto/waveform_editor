@@ -2,7 +2,6 @@ import React, { useCallback } from 'react';
 import { useWaveformStore } from '../../store/useWaveformStore';
 import type { WaveTool } from '../../types/wavedrom';
 import { DEFAULT_WAVEFORM } from '../../types/wavedrom';
-import { getSignalList } from '../../utils/waveformUtils';
 import { downloadSVG, downloadPNG } from '../../utils/exportUtils';
 import styles from './Toolbar.module.css';
 
@@ -28,12 +27,22 @@ const Toolbar: React.FC = () => {
     const waveformData = useWaveformStore((s) => s.waveformData);
     const jsonPanelVisible = useWaveformStore((s) => s.jsonPanelVisible);
     const setJsonPanelVisible = useWaveformStore((s) => s.setJsonPanelVisible);
-    const addTimeStep = useWaveformStore((s) => s.addTimeStep);
-    const removeTimeStep = useWaveformStore((s) => s.removeTimeStep);
     const undo = useWaveformStore((s) => s.undo);
     const redo = useWaveformStore((s) => s.redo);
     const canUndo = useWaveformStore((s) => s.canUndo);
     const canRedo = useWaveformStore((s) => s.canRedo);
+
+    // 選択ツール操作
+    const stepSelection = useWaveformStore((s) => s.stepSelection);
+    const insertCursor = useWaveformStore((s) => s.insertCursor);
+    const stepClipboard = useWaveformStore((s) => s.stepClipboard);
+    const insertStepsAtCursor = useWaveformStore((s) => s.insertStepsAtCursor);
+    const deleteSelectedSteps = useWaveformStore((s) => s.deleteSelectedSteps);
+    const copySteps = useWaveformStore((s) => s.copySteps);
+    const cutSteps = useWaveformStore((s) => s.cutSteps);
+    const pasteAtCursor = useWaveformStore((s) => s.pasteAtCursor);
+
+    const isSelectMode = selectedTool === 'select';
 
     /** 新規作成 */
     const handleNew = useCallback(() => {
@@ -76,15 +85,8 @@ const Toolbar: React.FC = () => {
         URL.revokeObjectURL(url);
     }, [waveformData]);
 
-    /** SVGエクスポート（wavedrom使用） */
-    const handleExportSVG = useCallback(() => {
-        downloadSVG(waveformData);
-    }, [waveformData]);
-
-    /** PNGエクスポート（wavedrom使用） */
-    const handleExportPNG = useCallback(() => {
-        downloadPNG(waveformData);
-    }, [waveformData]);
+    const handleExportSVG = useCallback(() => downloadSVG(waveformData), [waveformData]);
+    const handleExportPNG = useCallback(() => downloadPNG(waveformData), [waveformData]);
 
     return (
         <div className={styles.toolbar}>
@@ -107,17 +109,59 @@ const Toolbar: React.FC = () => {
 
             <div className={styles.separator} />
 
-            {/* タイムステップ操作 */}
+            {/* 選択ツール + 選択操作ボタン */}
             <div className={styles.group}>
-                <button className={styles.btn} onClick={addTimeStep} title="タイムステップを追加">+step</button>
                 <button
-                    className={styles.btn}
-                    onClick={removeTimeStep}
-                    title="タイムステップを削除"
-                    disabled={getSignalList(waveformData.signal).every((s) => s.wave.length <= 1)}
+                    className={`${styles.toolBtn} ${isSelectMode ? styles.active : ''}`}
+                    onClick={() => setSelectedTool('select')}
+                    title="選択ツール (S)"
                 >
-                    −step
+                    ▷ 選択
                 </button>
+                {isSelectMode && (
+                    <>
+                        <button
+                            className={styles.btn}
+                            onClick={() => insertStepsAtCursor()}
+                            disabled={insertCursor === null}
+                            title="カーソル位置にステップを挿入 (Insert)"
+                        >
+                            ＋挿入
+                        </button>
+                        <button
+                            className={styles.btn}
+                            onClick={deleteSelectedSteps}
+                            disabled={!stepSelection}
+                            title="選択範囲を削除 (Delete)"
+                        >
+                            削除
+                        </button>
+                        <button
+                            className={styles.btn}
+                            onClick={copySteps}
+                            disabled={!stepSelection}
+                            title="コピー (Ctrl+C)"
+                        >
+                            コピー
+                        </button>
+                        <button
+                            className={styles.btn}
+                            onClick={cutSteps}
+                            disabled={!stepSelection}
+                            title="カット (Ctrl+X)"
+                        >
+                            カット
+                        </button>
+                        <button
+                            className={styles.btn}
+                            onClick={pasteAtCursor}
+                            disabled={!stepClipboard || insertCursor === null}
+                            title="ペースト (Ctrl+V)"
+                        >
+                            ペースト
+                        </button>
+                    </>
+                )}
             </div>
 
             <div className={styles.separator} />

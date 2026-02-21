@@ -17,9 +17,19 @@ interface WaveRowProps {
     signal: WaveSignal;
     signalIndex: number;
     hoverStep: number | null;
+    insertCursor?: number | null;
+    stepSelection?: { from: number; to: number } | null;
+    isSelectMode?: boolean;
 }
 
-const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => {
+const WaveRow: React.FC<WaveRowProps> = ({
+    signal,
+    signalIndex,
+    hoverStep,
+    insertCursor = null,
+    stepSelection = null,
+    isSelectMode = false,
+}) => {
     const { wave, data } = signal;
     const selectedTool = useWaveformStore((s) => s.selectedTool);
     const setCell = useWaveformStore((s) => s.setCell);
@@ -64,15 +74,15 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
 
     const handleMouseMove = useCallback(
         (e: React.MouseEvent<SVGElement>) => {
+            if (isSelectMode) return; // 選択モード時はオーバーレイが代わりに処理
             const step = getCellIndex(e);
             setHoverInfo({ signalIndex, stepIndex: step });
             if (isDragging.current && dragStart.current !== null) {
                 setDragCurrentStep(step);
-                // 履歴は mousedown 時に積み済みなので pushHist=false
                 setCellRangeWithContinue(signalIndex, dragStart.current, step, selectedTool, false);
             }
         },
-        [signalIndex, selectedTool, getCellIndex, setHoverInfo, setCellRangeWithContinue]
+        [isSelectMode, signalIndex, selectedTool, getCellIndex, setHoverInfo, setCellRangeWithContinue]
     );
 
     const stopDrag = useCallback(() => {
@@ -281,18 +291,20 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
                     </text>
                 )}
 
-                {/* インタラクティブ透明レイヤー */}
-                <rect
-                    x={x + 1}
-                    y={0}
-                    width={CELL_WIDTH - 2}
-                    height={ROW_HEIGHT}
-                    fill="transparent"
-                    style={{ cursor: 'crosshair' }}
-                    onMouseDown={(e) => handleMouseDown(e, i)}
-                    onDoubleClick={(e) => handleDoubleClick(e, i)}
-                    onContextMenu={(e) => handleContextMenu(e, i)}
-                />
+                {/* インタラクティブ透明レイヤー（選択モード時は無効） */}
+                {!isSelectMode && (
+                    <rect
+                        x={x + 1}
+                        y={0}
+                        width={CELL_WIDTH - 2}
+                        height={ROW_HEIGHT}
+                        fill="transparent"
+                        style={{ cursor: 'crosshair' }}
+                        onMouseDown={(e) => handleMouseDown(e, i)}
+                        onDoubleClick={(e) => handleDoubleClick(e, i)}
+                        onContextMenu={(e) => handleContextMenu(e, i)}
+                    />
+                )}
             </g>
         );
     }
@@ -347,6 +359,32 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
                     </foreignObject>
                 );
             })()}
+
+            {/* 選択範囲オーバーレイ（列ハイライト） */}
+            {stepSelection && (
+                <rect
+                    x={stepSelection.from * CELL_WIDTH}
+                    y={0}
+                    width={(stepSelection.to - stepSelection.from + 1) * CELL_WIDTH}
+                    height={ROW_HEIGHT}
+                    fill="rgba(74,157,240,0.15)"
+                    stroke="none"
+                    style={{ pointerEvents: 'none' }}
+                />
+            )}
+
+            {/* 挿入カーソル縦線 */}
+            {insertCursor !== null && (
+                <line
+                    x1={insertCursor * CELL_WIDTH}
+                    y1={0}
+                    x2={insertCursor * CELL_WIDTH}
+                    y2={ROW_HEIGHT}
+                    stroke="#00d8ff"
+                    strokeWidth={2}
+                    style={{ pointerEvents: 'none' }}
+                />
+            )}
         </svg>
     );
 };

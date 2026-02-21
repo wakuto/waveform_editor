@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WaveDromData, WaveTool, AppState } from '../types/wavedrom';
+import type { WaveDromData, WaveSignal, WaveTool, AppState, StepClipboard } from '../types/wavedrom';
 import { DEFAULT_WAVEFORM } from '../types/wavedrom';
 import { isWaveSignal, getSignalList } from '../utils/waveformUtils';
 
@@ -22,9 +22,23 @@ interface WaveformStore extends AppState {
     renameSignal: (index: number, name: string) => void;
     moveSignal: (fromIndex: number, toIndex: number) => void;
 
-    // タイムステップ管理
+    // タイムステップ管理（レガシー: 末尾増減）
     addTimeStep: () => void;
     removeTimeStep: () => void;
+
+    // 挿入カーソル・選択ツール操作
+    setInsertCursor: (boundary: number | null) => void;
+    setStepSelection: (selection: { from: number; to: number } | null) => void;
+    /** 挿入カーソル位置に '.'.repeat(count) のサイクルを挿入 */
+    insertStepsAtCursor: (count?: number) => void;
+    /** 選択範囲のサイクルを削除 */
+    deleteSelectedSteps: () => void;
+    /** 選択範囲をクリップボードにコピー */
+    copySteps: () => void;
+    /** 選択範囲をクリップボードにコピーして削除 */
+    cutSteps: () => void;
+    /** 挿入カーソル位置にクリップボードの内容をペースト */
+    pasteAtCursor: () => void;
 
     // UI状態
     setSelectedTool: (tool: WaveTool) => void;
@@ -42,6 +56,82 @@ interface WaveformStore extends AppState {
 function pushHistory(state: AppState, prev: WaveDromData): Pick<AppState, 'undoStack' | 'redoStack'> {
     const undoStack = [...state.undoStack, prev].slice(-MAX_HISTORY);
     return { undoStack, redoStack: [] };
+}
+
+// ─── ステップ操作ヘルパー ────────────────────────────────────────────
+
+/** wave の位置 position に count 文字分の '.' を挿入する */
+function insertStepsIntoSignal(sig: WaveSignal, position: number, count: number): WaveSignal {
+    const wave = sig.wave;
+    const newWave = wave.slice(0, position) + '.'.repeat(count) + wave.slice(position);
+    return { ...sig, wave: newWave };
+}
+
+/** wave の from〜to（inclusive）を削除し、対応する data エントリも削除する */
+function deleteStepsFromSignal(sig: WaveSignal, from: number, to: number): WaveSignal {
+    const wave = sig.wave;
+    let dataCountBefore = 0;
+    let dataCountInRange = 0;
+    for (let i = 0; i < wave.length; i++) {
+        const ch = wave[i];
+        const isData = ch === '=' || (ch >= '2' && ch <= '9');
+        if (isData) {
+            if (i < from) dataCountBefore++;
+            else if (i <= to) dataCountInRange++;
+        }
+    }
+    const newWave = wave.slice(0, from) + wave.slice(to + 1);
+    const data = sig.data ? [...sig.data] : [];
+    if (dataCountInRange > 0) data.splice(dataCountBefore, dataCountInRange);
+    return { ...sig, wave: newWave, data: data.length > 0 ? data : undefined };
+}
+
+/** wave の from〜to の wave スライスと対応する data エントリを抽出する */
+function copyStepsFromSignal(sig: WaveSignal, from: number, to: number): { wave: string; data: string[] | undefined } {
+    const waveSlice = sig.wave.slice(from, to + 1);
+    let dataStart = 0;
+    let dataCount = 0;
+    for (let i = 0; i < sig.wave.length; i++) {
+        const ch = sig.wave[i];
+        const isData = ch === '=' || (ch >= '2' && ch <= '9');
+        if (isData) {
+            if (i < from) dataStart++;
+            else if (i <= to) dataCount++;
+        }
+    }
+    const data = sig.data ? sig.data.slice(dataStart, dataStart + dataCount) : undefined;
+    return { wave: waveSlice, data: data && data.length > 0 ? data : undefined };
+}
+
+/** wave の position に clipWave を挿入し、対応する data エントリも挿入する */
+function pasteStepsIntoSignal(sig: WaveSignal, position: number, clipWave: string, clipData: string[] | undefined): WaveSignal {
+    const wave = sig.wave;
+    let dataCountBefore = 0;
+    for (let i = 0; i < Math.min(position, wave.length); i++) {
+        const ch = wave[i];
+        if (ch === '=' || (ch >= '2' && ch <= '9')) dataCountBefore++;
+    }
+    const newWave = wave.slice(0, position) + clipWave + wave.slice(position);
+    const data = sig.data ? [...sig.data] : [];
+    if (clipData && clipData.length > 0) {
+        data.splice(dataCountBefore, 0, ...clipData);
+    }
+    return { ...sig, wave: newWave, data: data.length > 0 ? data : undefined };
+}
+
+/** signal 配列全体に対して mapper を適用して新しい配列を返す */
+function mapAllSignals(
+    signals: WaveDromData['signal'],
+    mapper: (sig: WaveSignal) => WaveSignal
+): WaveDromData['signal'] {
+    return signals.map((s) => {
+        if (Array.isArray(s)) {
+            const [label, ...rest] = s as [string, ...WaveSignal[]];
+            return [label, ...rest.map((r) => (isWaveSignal(r) ? mapper(r) : r))] as typeof s;
+        }
+        if (isWaveSignal(s)) return mapper(s);
+        return s;
+    });
 }
 
 /** フラットな信号リストのindexからwaveformData.signalを操作するためのヘルパー */
@@ -72,6 +162,9 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     jsonPanelVisible: false,
     hoverInfo: null,
     statusMessage: '',
+    insertCursor: null,
+    stepSelection: null,
+    stepClipboard: null,
 
     setWaveformData: (data, pushHist = true) =>
         set((state) => ({
@@ -240,10 +333,118 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             return { waveformData: newData, ...pushHistory(state, prev) };
         }),
 
-    setSelectedTool: (tool) => set({ selectedTool: tool }),
+    setSelectedTool: (tool) => set((state) => ({
+        selectedTool: tool,
+        // 編集ツールに切り替えたとき選択範囲をクリア、カーソルは保持
+        stepSelection: tool !== 'select' ? null : state.stepSelection,
+    })),
     setSelectedSignalIndex: (index) => set({ selectedSignalIndex: index }),
     setJsonPanelVisible: (visible) => set({ jsonPanelVisible: visible }),
     setHoverInfo: (info) => set({ hoverInfo: info }),
+
+    // ─── 挿入カーソル・選択ツール ─────────────────────────────────────
+    setInsertCursor: (boundary) => set({ insertCursor: boundary }),
+
+    setStepSelection: (selection) => set({ stepSelection: selection }),
+
+    insertStepsAtCursor: (count = 1) =>
+        set((state) => {
+            const cursor = state.insertCursor;
+            if (cursor === null) return {};
+            const prev = state.waveformData;
+            const newSignals = mapAllSignals(prev.signal, (sig) =>
+                insertStepsIntoSignal(sig, cursor, count)
+            );
+            const newData = { ...prev, signal: newSignals };
+            // カーソルを挿入後の位置に移動
+            return { waveformData: newData, insertCursor: cursor + count, ...pushHistory(state, prev) };
+        }),
+
+    deleteSelectedSteps: () =>
+        set((state) => {
+            const sel = state.stepSelection;
+            if (!sel) return {};
+            const prev = state.waveformData;
+            const { from, to } = sel;
+            const newSignals = mapAllSignals(prev.signal, (sig) =>
+                deleteStepsFromSignal(sig, from, to)
+            );
+            const newData = { ...prev, signal: newSignals };
+            // 削除後のカーソル位置: 選択開始位置（最大値クランプ）
+            const maxLen = getSignalList(newData.signal).reduce((m, s) => Math.max(m, s.wave.length), 0);
+            const newCursor = Math.min(from, maxLen);
+            return {
+                waveformData: newData,
+                stepSelection: null,
+                insertCursor: newCursor,
+                ...pushHistory(state, prev),
+            };
+        }),
+
+    copySteps: () =>
+        set((state) => {
+            const sel = state.stepSelection;
+            if (!sel) return {};
+            const { from, to } = sel;
+            const signals = getSignalList(state.waveformData.signal);
+            const clipboard: StepClipboard = {
+                waves: signals.map((sig) => copyStepsFromSignal(sig, from, to).wave),
+                dataSlices: signals.map((sig) => copyStepsFromSignal(sig, from, to).data),
+            };
+            return { stepClipboard: clipboard };
+        }),
+
+    cutSteps: () =>
+        set((state) => {
+            const sel = state.stepSelection;
+            if (!sel) return {};
+            const { from, to } = sel;
+            const signals = getSignalList(state.waveformData.signal);
+            const clipboard: StepClipboard = {
+                waves: signals.map((sig) => copyStepsFromSignal(sig, from, to).wave),
+                dataSlices: signals.map((sig) => copyStepsFromSignal(sig, from, to).data),
+            };
+            const prev = state.waveformData;
+            const newSignals = mapAllSignals(prev.signal, (sig) =>
+                deleteStepsFromSignal(sig, from, to)
+            );
+            const newData = { ...prev, signal: newSignals };
+            const maxLen = getSignalList(newData.signal).reduce((m, s) => Math.max(m, s.wave.length), 0);
+            const newCursor = Math.min(from, maxLen);
+            return {
+                waveformData: newData,
+                stepClipboard: clipboard,
+                stepSelection: null,
+                insertCursor: newCursor,
+                ...pushHistory(state, prev),
+            };
+        }),
+
+    pasteAtCursor: () =>
+        set((state) => {
+            const cursor = state.insertCursor;
+            const clipboard = state.stepClipboard;
+            if (cursor === null || !clipboard) return {};
+            const prev = state.waveformData;
+            const flatSignals = getSignalList(prev.signal);
+            let clipIdx = 0;
+            const newSignals = mapAllSignals(prev.signal, (sig) => {
+                const idx = flatSignals.indexOf(sig);
+                const clipWave = clipboard.waves[idx] ?? '.'.repeat(clipboard.waves[0]?.length ?? 1);
+                const clipData = clipboard.dataSlices[idx];
+                const result = pasteStepsIntoSignal(sig, cursor, clipWave, clipData);
+                clipIdx++;
+                return result;
+            });
+            void clipIdx;
+            const pasteLen = clipboard.waves[0]?.length ?? 0;
+            const newData = { ...prev, signal: newSignals };
+            return {
+                waveformData: newData,
+                insertCursor: cursor + pasteLen,
+                ...pushHistory(state, prev),
+            };
+        }),
 
     undo: () =>
         set((state) => {

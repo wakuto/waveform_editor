@@ -13,8 +13,16 @@ export type WaveChar =
     | '|' // Gap
     | '.'; // Continue
 
-/** 編集ツールとして使える波形状態 */
-export type WaveTool = WaveChar;
+/** 編集ツールとして使える波形状態 + 選択ツール */
+export type WaveTool = WaveChar | 'select';
+
+/** タイムステップ選択ツール用クリップボード */
+export interface StepClipboard {
+    /** 各信号の cut/copy 範囲の wave 文字列スライス（全信号分） */
+    waves: string[];
+    /** 各信号の data 配列のうち、範囲内のエントリ */
+    dataSlices: (string[] | undefined)[];
+}
 
 /** 単一信号の定義 */
 export interface WaveSignal {
@@ -69,6 +77,12 @@ export interface AppState {
     jsonPanelVisible: boolean;
     hoverInfo: { signalIndex: number; stepIndex: number } | null;
     statusMessage: string;
+    /** 挿入カーソル位置（サイクル境界インデックス: 0〜N） */
+    insertCursor: number | null;
+    /** 選択中のサイクル範囲（from/to はステップインデックス 0〜N-1） */
+    stepSelection: { from: number; to: number } | null;
+    /** コピー/カット済みクリップボード */
+    stepClipboard: StepClipboard | null;
 }
 
 /** デフォルトの初期波形データ */

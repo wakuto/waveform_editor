@@ -130,3 +130,61 @@
     border-color: #4a9df0;
     color: #4a9df0;
 }
+
+/* ─── 選択ツール用スタイル ──────────────────────────────────── */
+
+/* 選択モード時のステップヘッダー（カーソル可） */
+.stepsHeaderSelect {
+    cursor: col-resize;
+    user-select: none;
+}
+
+/* 選択中のステップ番号セル */
+.stepNumberSelected {
+    background: rgba(74, 157, 240, 0.25);
+    color: #9dd0ff;
+}
+
+/* 選択範囲ハイライト（ヘッダー上） */
+.selectionOverlayHeader {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(74, 157, 240, 0.22);
+    border-left: 1px solid rgba(74, 157, 240, 0.6);
+    border-right: 1px solid rgba(74, 157, 240, 0.6);
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* 挿入カーソルライン（ヘッダー上） */
+.cursorMarkerHeader {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #00d8ff;
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* カーソルホバープレビュー（ヘッダー上） */
+.cursorPreviewHeader {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: rgba(0, 216, 255, 0.35);
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* 選択モード用透明オーバーレイ（波形エリア全体） */
+.selectOverlay {
+    position: absolute;
+    top: 0;
+    cursor: crosshair;
+    pointer-events: all;
+    z-index: 5;
+    background: transparent;
+}

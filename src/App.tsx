@@ -17,6 +17,7 @@ const KEY_TOOL_MAP: Record<string, WaveTool> = {
   'd': '=',
   '.': '.',
   '|': '|',
+  's': 'select',
 };
 
 const App: React.FC = () => {
@@ -27,7 +28,16 @@ const App: React.FC = () => {
   const setWaveformData = useWaveformStore((s) => s.setWaveformData);
   const waveformData = useWaveformStore((s) => s.waveformData);
   const selectedSignalIndex = useWaveformStore((s) => s.selectedSignalIndex);
+  const selectedTool = useWaveformStore((s) => s.selectedTool);
   const removeSignal = useWaveformStore((s) => s.removeSignal);
+  const insertStepsAtCursor = useWaveformStore((s) => s.insertStepsAtCursor);
+  const deleteSelectedSteps = useWaveformStore((s) => s.deleteSelectedSteps);
+  const copySteps = useWaveformStore((s) => s.copySteps);
+  const cutSteps = useWaveformStore((s) => s.cutSteps);
+  const pasteAtCursor = useWaveformStore((s) => s.pasteAtCursor);
+  const stepSelection = useWaveformStore((s) => s.stepSelection);
+  const insertCursor = useWaveformStore((s) => s.insertCursor);
+  const stepClipboard = useWaveformStore((s) => s.stepClipboard);
 
   // LocalStorageからの復元（初回マウント時のみ）
   useEffect(() => {
@@ -69,11 +79,31 @@ const App: React.FC = () => {
           URL.revokeObjectURL(url);
           return;
         }
+        // 選択ツール時のコピー/カット/ペースト
+        if (selectedTool === 'select') {
+          if (e.key === 'c') { e.preventDefault(); if (stepSelection) copySteps(); return; }
+          if (e.key === 'x') { e.preventDefault(); if (stepSelection) cutSteps(); return; }
+          if (e.key === 'v') { e.preventDefault(); if (stepClipboard && insertCursor !== null) pasteAtCursor(); return; }
+        }
         return;
       }
 
-      if (e.key === 'Delete' && selectedSignalIndex !== null) {
-        removeSignal(selectedSignalIndex);
+      // Delete / Backspace
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedTool === 'select') {
+          if (stepSelection) { e.preventDefault(); deleteSelectedSteps(); }
+        } else if (selectedSignalIndex !== null) {
+          removeSignal(selectedSignalIndex);
+        }
+        return;
+      }
+
+      // Insert: カーソル位置にステップ挿入（選択ツール時のみ）
+      if (e.key === 'Insert') {
+        if (selectedTool === 'select' && insertCursor !== null) {
+          e.preventDefault();
+          insertStepsAtCursor();
+        }
         return;
       }
 
@@ -83,7 +113,12 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo, setSelectedTool, waveformData, selectedSignalIndex, removeSignal]);
+  }, [
+    undo, redo, setSelectedTool, waveformData,
+    selectedSignalIndex, removeSignal, selectedTool,
+    stepSelection, insertCursor, stepClipboard,
+    insertStepsAtCursor, deleteSelectedSteps, copySteps, cutSteps, pasteAtCursor,
+  ]);
 
   return (
     <div className={styles.app}>
