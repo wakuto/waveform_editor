@@ -24,6 +24,7 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
     const selectedTool = useWaveformStore((s) => s.selectedTool);
     const setCell = useWaveformStore((s) => s.setCell);
     const setCellRangeWithContinue = useWaveformStore((s) => s.setCellRangeWithContinue);
+    const beginDragEdit = useWaveformStore((s) => s.beginDragEdit);
     const setHoverInfo = useWaveformStore((s) => s.setHoverInfo);
     const setDataLabel = useWaveformStore((s) => s.setDataLabel);
 
@@ -45,13 +46,16 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
             if (e.button !== 0) return;
             // ブラウザのネイティブドラッグを防止
             e.preventDefault();
+            // ドラッグ開始前に現在状態を履歴に1回だけ記録
+            beginDragEdit();
             isDragging.current = true;
             dragStart.current = stepIndex;
             setIsDraggingState(true);
             setDragCurrentStep(stepIndex);
-            setCell(signalIndex, stepIndex, selectedTool);
+            // 履歴は beginDragEdit で積み済みなので pushHist=false
+            setCell(signalIndex, stepIndex, selectedTool, false);
         },
-        [signalIndex, selectedTool, setCell]
+        [signalIndex, selectedTool, setCell, beginDragEdit]
     );
 
     const handleMouseMove = useCallback(
@@ -60,7 +64,8 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
             setHoverInfo({ signalIndex, stepIndex: step });
             if (isDragging.current && dragStart.current !== null) {
                 setDragCurrentStep(step);
-                setCellRangeWithContinue(signalIndex, dragStart.current, step, selectedTool);
+                // 履歴は mousedown 時に積み済みなので pushHist=false
+                setCellRangeWithContinue(signalIndex, dragStart.current, step, selectedTool, false);
             }
         },
         [signalIndex, selectedTool, getCellIndex, setHoverInfo, setCellRangeWithContinue]

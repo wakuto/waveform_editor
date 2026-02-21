@@ -8,10 +8,12 @@ const MAX_HISTORY = 50;
 interface WaveformStore extends AppState {
     // 波形データ操作
     setWaveformData: (data: WaveDromData, pushHistory?: boolean) => void;
-    setCell: (signalIndex: number, stepIndex: number, value: string) => void;
+    setCell: (signalIndex: number, stepIndex: number, value: string, pushHist?: boolean) => void;
     setCellRange: (signalIndex: number, startStep: number, endStep: number, value: string) => void;
     /** ドラッグ挿入用: dragStartStep の位置に value を、残りのセルに '.' を設定 */
-    setCellRangeWithContinue: (signalIndex: number, dragStartStep: number, currentStep: number, value: string) => void;
+    setCellRangeWithContinue: (signalIndex: number, dragStartStep: number, currentStep: number, value: string, pushHist?: boolean) => void;
+    /** ドラッグ開始時に現在の状態を1回だけ undo スタックに積む */
+    beginDragEdit: () => void;
     setDataLabel: (signalIndex: number, stepIndex: number, label: string) => void;
 
     // 信号管理
@@ -77,7 +79,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             ...(pushHist ? pushHistory(state, state.waveformData) : {}),
         })),
 
-    setCell: (signalIndex, stepIndex, value) =>
+    setCell: (signalIndex, stepIndex, value, pushHist = true) =>
         set((state) => {
             const prev = state.waveformData;
             const newData = updateFlatSignal(prev, signalIndex, (sig) => {
@@ -87,7 +89,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
                 waveArr[stepIndex] = value;
                 return { ...sig, wave: waveArr.join('') };
             });
-            return { waveformData: newData, ...pushHistory(state, prev) };
+            return { waveformData: newData, ...(pushHist ? pushHistory(state, prev) : {}) };
         }),
 
     setCellRange: (signalIndex, startStep, endStep, value) =>
@@ -104,7 +106,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             return { waveformData: newData, ...pushHistory(state, prev) };
         }),
 
-    setCellRangeWithContinue: (signalIndex, dragStartStep, currentStep, value) =>
+    setCellRangeWithContinue: (signalIndex, dragStartStep, currentStep, value, pushHist = true) =>
         set((state) => {
             const prev = state.waveformData;
             const from = Math.min(dragStartStep, currentStep);
@@ -117,8 +119,14 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
                 for (let i = from + 1; i <= to; i++) waveArr[i] = '.';
                 return { ...sig, wave: waveArr.join('') };
             });
-            return { waveformData: newData, ...pushHistory(state, prev) };
+            return { waveformData: newData, ...(pushHist ? pushHistory(state, prev) : {}) };
         }),
+
+    beginDragEdit: () =>
+        set((state) => ({
+            undoStack: [...state.undoStack, state.waveformData].slice(-MAX_HISTORY),
+            redoStack: [],
+        })),
 
     setDataLabel: (signalIndex, stepIndex, label) =>
         set((state) => {
