@@ -13,8 +13,8 @@ export type WaveChar =
     | '|' // Gap
     | '.'; // Continue
 
-/** 編集ツールとして使える波形状態 + 選択ツール */
-export type WaveTool = WaveChar | 'select';
+/** 編集ツールとして使える波形状態 + 選択ツール + エッジツール */
+export type WaveTool = WaveChar | 'select' | 'edge';
 
 /** タイムステップ選択ツール用クリップボード */
 export interface StepClipboard {

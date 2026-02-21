@@ -120,6 +120,13 @@ const Toolbar: React.FC = () => {
                 >
                     ▷ 選択
                 </button>
+                <button
+                    className={`${styles.btn} ${selectedTool === 'edge' ? styles.active : ''}`}
+                    onClick={() => setSelectedTool('edge')}
+                    title="エッジツール (E)"
+                >
+                    ↗ エッジ
+                </button>
                 {isSelectMode && (
                     <>
                         <button

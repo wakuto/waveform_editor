@@ -22,6 +22,7 @@ const TOOL_NAMES: Record<string, string> = {
     '.': 'Continue (.)',
     '|': 'Gap (|)',
     'select': '▷ 選択',
+    'edge': '↗ エッジ',
 };
 
 const StatusBar: React.FC = () => {

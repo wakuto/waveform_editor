@@ -3,6 +3,7 @@ import { useWaveformStore } from '../../store/useWaveformStore';
 import type { WaveTool } from '../../types/wavedrom';
 import { getSignalList, BASE_CELL_WIDTH, ROW_HEIGHT, LABEL_WIDTH } from '../../utils/waveformUtils';
 import WaveRow from './WaveRow';
+import EdgeOverlay from './EdgeOverlay';
 import styles from './WaveformCanvas.module.css';
 
 const TOOLS: { key: WaveTool; label: string; title: string }[] = [
@@ -19,6 +20,7 @@ const TOOLS: { key: WaveTool; label: string; title: string }[] = [
     { key: '.', label: '.', title: 'Continue' },
     { key: '|', label: '|', title: 'Gap' },
     { key: 'select', label: 'Select', title: 'Select Tool' },
+    { key: 'edge', label: 'Edge', title: 'Edge Tool' },
 ];
 
 /** ヘッダーのサイクル境界検知ゾーン (px) */
@@ -188,9 +190,10 @@ const WaveformCanvas: React.FC = () => {
         if (e.button === 2) { // Right click
             // 波形領域内でのみツールメニューを表示する
             const target = e.target as Element;
-            const isWaveArea = target.closest(`.${styles.waveArea}`) || target.closest(`.${styles.selectOverlay}`);
+            const isWaveArea = target.closest(`.${styles.waveArea}`) || target.closest(`.${styles.selectOverlay}`) || target.closest('svg[class*="edgeOverlay"]');
+            const isEdge = target.closest('.edge-group');
 
-            if (isWaveArea) {
+            if (isWaveArea && !isEdge) {
                 setToolMenu({ x: e.clientX, y: e.clientY });
                 setHoveredTool(null);
                 isToolMenuOpenRef.current = true;
@@ -357,7 +360,7 @@ const WaveformCanvas: React.FC = () => {
 
     // ─── 波形エリアオーバーレイの操作（選択モードのみ） ───────────────
 
-    const { totalRowsHeight, getSignalIndexFromY } = React.useMemo(() => {
+    const { totalRowsHeight, getSignalIndexFromY, getYFromSignalIndex } = React.useMemo(() => {
         let currentY = 0;
         const rowMap: { y: number; height: number; signalIndex: number | null }[] = [];
         let flatIndex = 0;
@@ -385,19 +388,24 @@ const WaveformCanvas: React.FC = () => {
         traverse(waveformData.signal, []);
 
         const getIndex = (relY: number) => {
-            let lastValidIndex = 0;
             for (const row of rowMap) {
-                if (row.signalIndex !== null) {
-                    lastValidIndex = row.signalIndex;
-                }
                 if (relY >= row.y && relY < row.y + row.height) {
-                    return row.signalIndex !== null ? row.signalIndex : lastValidIndex;
+                    return row.signalIndex;
                 }
             }
-            return lastValidIndex;
+            return null;
         };
 
-        return { totalRowsHeight: currentY, getSignalIndexFromY: getIndex };
+        const getYFromIndex = (signalIndex: number) => {
+            for (const row of rowMap) {
+                if (row.signalIndex === signalIndex) {
+                    return row.y + row.height / 2;
+                }
+            }
+            return null;
+        };
+
+        return { totalRowsHeight: currentY, getSignalIndexFromY: getIndex, getYFromSignalIndex: getYFromIndex };
     }, [waveformData.signal, collapsedGroups]);
 
     const handleWaveOverlayMouseDown = useCallback(
@@ -410,6 +418,8 @@ const WaveformCanvas: React.FC = () => {
 
             // クリックした行（信号インデックス）を計算
             const signalIndex = getSignalIndexFromY(relY);
+            if (signalIndex === null) return;
+
             setSelectedSignalIndex(signalIndex);
 
             if (isNearBoundary(relX, CELL_WIDTH)) {
@@ -441,6 +451,7 @@ const WaveformCanvas: React.FC = () => {
 
             const cycle = Math.max(0, Math.min(Math.floor(relX / CELL_WIDTH), maxLen - 1));
             const signalIndex = getSignalIndexFromY(relY);
+            if (signalIndex === null) return;
 
             // ドラッグで範囲選択（単一信号選択）
             const from = Math.min(selectDragStartCycle.current, cycle);
@@ -468,6 +479,8 @@ const WaveformCanvas: React.FC = () => {
             const relY = e.clientY - rect.top;
 
             const signalIndex = getSignalIndexFromY(relY);
+            if (signalIndex === null) return;
+
             const stepIndex = Math.max(0, Math.min(Math.floor(relX / CELL_WIDTH), maxLen - 1));
 
             useWaveformStore.getState().openDataLabelEdit(signalIndex, stepIndex);
@@ -745,6 +758,16 @@ const WaveformCanvas: React.FC = () => {
                         onDoubleClick={handleWaveOverlayDoubleClick}
                     />
                 )}
+
+                {/* エッジ描画用オーバーレイ */}
+                <div style={{ position: 'absolute', left: LABEL_WIDTH, top: 0, pointerEvents: 'none' }}>
+                    <EdgeOverlay
+                        totalWaveWidth={totalWaveWidth}
+                        totalRowsHeight={totalRowsHeight}
+                        getYFromSignalIndex={getYFromSignalIndex}
+                        getSignalIndexFromY={getSignalIndexFromY}
+                    />
+                </div>
 
                 {/* 信号追加ボタン */}
                 <div
