@@ -57,6 +57,34 @@ export interface SegmentPath {
 
 type PrevChar = string | null;
 
+function getPrevY(prev: PrevChar): number[] {
+    if (prev === null) return [WAVE_BOT];
+    if (prev === '0') return [WAVE_BOT];
+    if (prev === '1') return [WAVE_TOP];
+    if (prev === 'z') return [WAVE_MID];
+    if (prev === 'p' || prev === 'n') return [WAVE_BOT]; // クロックは下で終わる
+    if (isDataChar(prev) || prev === 'x') return [WAVE_TOP, WAVE_BOT];
+    return [WAVE_BOT];
+}
+
+function getTransitionPath(prevY: number[], curY: number[], x: number, slope: number): string {
+    if (prevY.length === 1 && curY.length === 1) {
+        if (prevY[0] === curY[0]) return ''; // 変化なし
+        return `M${x} ${prevY[0]} L${x + slope} ${curY[0]}`;
+    }
+    if (prevY.length === 1 && curY.length === 2) {
+        return `M${x} ${prevY[0]} L${x + slope} ${curY[0]} M${x} ${prevY[0]} L${x + slope} ${curY[1]}`;
+    }
+    if (prevY.length === 2 && curY.length === 1) {
+        return `M${x} ${prevY[0]} L${x + slope} ${curY[0]} M${x} ${prevY[1]} L${x + slope} ${curY[0]}`;
+    }
+    if (prevY.length === 2 && curY.length === 2) {
+        // クロス
+        return `M${x} ${prevY[0]} L${x + slope} ${curY[1]} M${x} ${prevY[1]} L${x + slope} ${curY[0]}`;
+    }
+    return '';
+}
+
 /**
  * @param char           解決済み波形文字（'.' は解決済み）
  * @param prev           解決済み直前波形文字
@@ -79,8 +107,9 @@ export function getSegmentPath(
     const x0 = x;
     const x1 = x + width;
     const xm = x + width / 2;
-    const slope = 4;  // 遷移斜め線の水平オフセット (px)
-    const dipW = slope * 2; // ディップ/バンプの幅
+
+    // 拡大率に応じて slope を調整
+    const slope = 4 * (width / BASE_CELL_WIDTH);
 
     const prevIsData = prev !== null && isDataChar(prev);
     const curIsData = isDataChar(char);
@@ -88,16 +117,15 @@ export function getSegmentPath(
     // ─── Low (0) ─────────────────────────────────────────────────────
     if (char === '0') {
         if (isContinue) {
-            // '.' 継続：境界なしでフラット延長
             return { d: `M${x0} ${b} L${x1} ${b}` };
         }
         if (prev === '0') {
-            // 明示的 0→0：バンプ（中間まで持ち上がって戻る）で境界を明示
-            return { d: `M${x0} ${b} L${x0 + slope} ${m} L${x0 + dipW} ${b} L${x1} ${b}` };
+            // 明示的 0→0：バンプ
+            return { d: `M${x0} ${b} L${x0 + slope / 2} ${m} L${x0 + slope} ${b} L${x1} ${b}` };
         }
-        const startY = getEndY(prev);
-        const transLine = startY !== b ? `M${x0} ${startY} L${x0 + slope} ${b}` : '';
-        return { d: `${transLine} M${x0} ${b} L${x1} ${b}` };
+        const prevY = getPrevY(prev);
+        const transLine = getTransitionPath(prevY, [b], x0, slope);
+        return { d: `${transLine} M${x0 + slope} ${b} L${x1} ${b}`.trim() };
     }
 
     // ─── High (1) ────────────────────────────────────────────────────
@@ -106,55 +134,71 @@ export function getSegmentPath(
             return { d: `M${x0} ${t} L${x1} ${t}` };
         }
         if (prev === '1') {
-            // 明示的 1→1：ディップ（中間まで落ちて戻る）で境界を明示
-            return { d: `M${x0} ${t} L${x0 + slope} ${m} L${x0 + dipW} ${t} L${x1} ${t}` };
+            // 明示的 1→1：ディップ
+            return { d: `M${x0} ${t} L${x0 + slope / 2} ${m} L${x0 + slope} ${t} L${x1} ${t}` };
         }
-        const startY = getEndY(prev);
-        const transLine = startY !== t ? `M${x0} ${startY} L${x0 + slope} ${t}` : '';
-        return { d: `${transLine} M${x0} ${t} L${x1} ${t}` };
+        const prevY = getPrevY(prev);
+        const transLine = getTransitionPath(prevY, [t], x0, slope);
+        return { d: `${transLine} M${x0 + slope} ${t} L${x1} ${t}`.trim() };
     }
 
     // ─── Continue (.) ────────────────────────────────────────────────
-    // resolveWave により通常ここには到達しない（isContinue フラグで制御済み）
     if (char === '.') {
-        if (prevIsData) return buildBoxSegment(x, width, true, isNextContinue, (DATA_COLORS[prev ?? '='] ?? DATA_COLORS['=']) + '55');
-        return { d: `M${x0} ${getEndY(prev)} L${x1} ${getEndY(prev)}` };
+        if (prevIsData) return buildBoxSegment(x, width, true, prev, (DATA_COLORS[prev ?? '='] ?? DATA_COLORS['=']) + '55');
+        const prevY = getPrevY(prev);
+        if (prevY.length === 1) {
+            return { d: `M${x0} ${prevY[0]} L${x1} ${prevY[0]}` };
+        }
+        return { d: `M${x0} ${t} L${x1} ${t} M${x0} ${b} L${x1} ${b}` };
     }
 
     // ─── Positive Edge Clock (p) ──────────────────────────────────────
     if (char === 'p') {
         const isFirstP = prev !== 'p';
-        const startY = isFirstP ? getEndY(prev) : b;
-        const lead = isFirstP && startY !== b ? `M${x0} ${startY} L${x0} ${b}` : '';
-        return {
-            d: `${lead} M${x0} ${b} L${x0} ${t} L${xm} ${t} L${xm} ${b} L${x1} ${b}`,
-        };
+        let d = '';
+        if (isFirstP) {
+            const prevY = getPrevY(prev);
+            const transLine = getTransitionPath(prevY, [b], x0, 0);
+            d = `${transLine} M${x0} ${b} L${x0} ${t} L${xm} ${t} L${xm} ${b} L${x1} ${b}`;
+        } else {
+            d = `M${x0} ${b} L${x0} ${t} L${xm} ${t} L${xm} ${b} L${x1} ${b}`;
+        }
+        return { d: d.trim() };
     }
 
     // ─── Negative Edge Clock (n) ──────────────────────────────────────
     if (char === 'n') {
         const isFirstN = prev !== 'n';
-        const startY = isFirstN ? getEndY(prev) : t;
-        const lead = isFirstN && startY !== t ? `M${x0} ${startY} L${x0} ${t}` : '';
-        return {
-            d: `${lead} M${x0} ${t} L${x0} ${b} L${xm} ${b} L${xm} ${t} L${x1} ${t}`,
-        };
+        let d = '';
+        if (isFirstN) {
+            const prevY = getPrevY(prev);
+            const transLine = getTransitionPath(prevY, [t], x0, 0);
+            d = `${transLine} M${x0} ${t} L${x0} ${b} L${xm} ${b} L${xm} ${t} L${x1} ${t}`;
+        } else {
+            d = `M${x0} ${t} L${x0} ${b} L${xm} ${b} L${xm} ${t} L${x1} ${t}`;
+        }
+        return { d: d.trim() };
     }
 
     // ─── High-Z (z) ──────────────────────────────────────────────────
     if (char === 'z') {
-        return { d: `M${x0} ${m} L${x1} ${m}` };
+        if (isContinue) {
+            return { d: `M${x0} ${m} L${x1} ${m}` };
+        }
+        const prevY = getPrevY(prev);
+        const transLine = getTransitionPath(prevY, [m], x0, slope);
+        return { d: `${transLine} M${x0 + slope} ${m} L${x1} ${m}`.trim() };
     }
 
     // ─── Undefined (x) ───────────────────────────────────────────────
     if (char === 'x') {
-        return buildBoxSegment(x, width, isContinue, isNextContinue, 'rgba(200,60,60,0.25)');
+        return buildBoxSegment(x, width, isContinue, prev, 'rgba(200,60,60,0.25)');
     }
 
     // ─── Data (=, 2–9) ───────────────────────────────────────────────
     if (curIsData) {
         const color = (DATA_COLORS[char] ?? DATA_COLORS['=']) + '55';
-        return buildBoxSegment(x, width, isContinue, isNextContinue, color);
+        return buildBoxSegment(x, width, isContinue, prev, color);
     }
 
     // ─── Gap (|) ─────────────────────────────────────────────────────
@@ -179,54 +223,33 @@ function buildBoxSegment(
     x: number,
     width: number,
     isContinue: boolean,
-    isNextContinue: boolean,
+    prev: PrevChar,
     fillColor: string
 ): SegmentPath {
     const t = WAVE_TOP;
     const m = WAVE_MID;
     const b = WAVE_BOT;
-    const slope = 4;
+    const slope = 4 * (width / BASE_CELL_WIDTH);
     const x1 = x + width;
 
-    // 上辺・下辺の開始X（左端が < なら slope 分内側から、継続なら端から）
-    const lx = isContinue ? x : x + slope;
-    // 上辺・下辺の終了X（右端が > なら slope 分手前まで、継続なら端まで）
-    const rx = isNextContinue ? x1 : x1 - slope;
+    let d = '';
+    let fill = '';
 
-    // ストローク: 上辺・下辺
-    const topLine = `M${lx} ${t} L${rx} ${t}`;
-    const botLine = `M${lx} ${b} L${rx} ${b}`;
-    // 左端 < スパイク (新規開始時のみ)
-    const leftSpike = !isContinue ? `M${x + slope} ${t} L${x} ${m} L${x + slope} ${b}` : '';
-    // 右端 > スパイク (次が継続でないときのみ)
-    const rightSpike = !isNextContinue ? `M${x1 - slope} ${t} L${x1} ${m} L${x1 - slope} ${b}` : '';
-    const d = `${leftSpike} ${topLine} ${botLine} ${rightSpike}`.trim();
-
-    // 塗りつぶし多角形 (左右それぞれ < > 有無で頂点を変える)
-    let fill: string;
-    if (!isContinue && !isNextContinue) {
-        // 両端 <>: 六角形
-        fill = `M${x} ${m} L${x + slope} ${t} L${x1 - slope} ${t} L${x1} ${m} L${x1 - slope} ${b} L${x + slope} ${b} Z`;
-    } else if (isContinue && !isNextContinue) {
-        // 左フラット・右 >: 五角形
-        fill = `M${x} ${t} L${x1 - slope} ${t} L${x1} ${m} L${x1 - slope} ${b} L${x} ${b} Z`;
-    } else if (!isContinue && isNextContinue) {
-        // 左 <・右フラット: 五角形
-        fill = `M${x} ${m} L${x + slope} ${t} L${x1} ${t} L${x1} ${b} L${x + slope} ${b} Z`;
-    } else {
-        // 両端フラット: 矩形
+    if (isContinue) {
+        d = `M${x} ${t} L${x1} ${t} M${x} ${b} L${x1} ${b}`;
         fill = `M${x} ${t} L${x1} ${t} L${x1} ${b} L${x} ${b} Z`;
+    } else {
+        const prevY = getPrevY(prev);
+        const curY = [t, b];
+        const transLine = getTransitionPath(prevY, curY, x, slope);
+        const topLine = `M${x + slope} ${t} L${x1} ${t}`;
+        const botLine = `M${x + slope} ${b} L${x1} ${b}`;
+
+        d = `${transLine} ${topLine} ${botLine}`.trim();
+        fill = `M${x + slope} ${t} L${x1} ${t} L${x1} ${b} L${x + slope} ${b} Z`;
     }
 
     return { d, fill, fillColor };
-}
-
-/** 直前の波形状態のY座標（次のセルの開始Y）を返す */
-function getEndY(prev: PrevChar): number {
-    if (prev === null || prev === '0') return WAVE_BOT;
-    if (prev === '1') return WAVE_TOP;
-    if (prev === 'p' || prev === 'n') return WAVE_BOT; // クロックは常に下で終わる
-    return WAVE_MID;
 }
 
 /** wave文字列から各セルの実効値（'.'を解決した）を返す */
