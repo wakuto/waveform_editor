@@ -411,7 +411,16 @@ function updateFlatSignal(
     // deepコピーしてtargetを置き換え
     const newData = JSON.parse(JSON.stringify(data)) as WaveDromData;
     const newFlat = getSignalList(newData.signal);
+
     Object.assign(newFlat[flatIndex], updated);
+
+    // undefined のプロパティは削除する
+    Object.keys(newFlat[flatIndex]).forEach(key => {
+        if ((newFlat[flatIndex] as any)[key] === undefined) {
+            delete (newFlat[flatIndex] as any)[key];
+        }
+    });
+
     return newData;
 }
 

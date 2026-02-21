@@ -169,6 +169,9 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
         if (e.button !== 0) return; // 左クリックのみ
         if (!svgRef.current) return;
 
+        // ドラッグ中のテキスト選択を防止
+        e.preventDefault();
+
         // エッジのテキスト編集中は新しいエッジを描画しない
         if (editingEdgeIndex !== null) return;
 
@@ -667,7 +670,8 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
             style={{
                 width: totalWaveWidth,
                 height: totalRowsHeight,
-                pointerEvents: isEdgeMode ? 'auto' : 'none'
+                pointerEvents: isEdgeMode ? 'auto' : 'none',
+                userSelect: isEdgeMode ? 'none' : 'auto'
             }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}

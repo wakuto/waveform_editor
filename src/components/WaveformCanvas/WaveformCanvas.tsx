@@ -182,7 +182,7 @@ const WaveformCanvas: React.FC = () => {
 
     // ツールメニューに表示するツールを絞り込む
     const RADIAL_TOOLS = React.useMemo(() => {
-        const allowedKeys = ['0', '1', '=', 'x', '.', 'select'];
+        const allowedKeys = ['0', '1', '=', 'x', '.', 'select', 'edge'];
         return TOOLS.filter(tool => allowedKeys.includes(tool.key));
     }, []);
 

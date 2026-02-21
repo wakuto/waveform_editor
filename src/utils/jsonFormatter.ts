@@ -62,7 +62,9 @@ export function formatWaveDromJSON(data: WaveDromData): string {
                 const restKeys = Object.keys(rest);
                 if (restKeys.length > 0) {
                     for (const key of restKeys) {
-                        line += `, ${JSON.stringify(key)}: ${JSON.stringify(rest[key])}`;
+                        if (rest[key] !== undefined) {
+                            line += `, ${JSON.stringify(key)}: ${JSON.stringify(rest[key])}`;
+                        }
                     }
                 }
 
