@@ -34,6 +34,10 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
     // ドラッグ中UIフィードバック用 state
     const [isDraggingState, setIsDraggingState] = useState(false);
     const [dragCurrentStep, setDragCurrentStep] = useState<number | null>(null);
+    // ラベルインライン編集用 state
+    const [editingDataStep, setEditingDataStep] = useState<number | null>(null);
+    const [editingLabel, setEditingLabel] = useState('');
+    const editInputRef = useRef<HTMLInputElement>(null);
 
     const getCellIndex = useCallback((e: React.MouseEvent<SVGElement>) => {
         const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
@@ -89,20 +93,77 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
         // ドラッグ中は isDragging を維持（window mouseup で終了）
     }, [setHoverInfo]);
 
-    const handleDoubleClick = useCallback(
-        (_e: React.MouseEvent<SVGRectElement>, stepIndex: number) => {
-            // '.' の場合も含め、解決済みの文字でデータ判定する
+    /** '.' を後ろ向きに解決して、その波形の起源となるデータセルのインデックスを返す */
+    const resolveDataSrcStep = useCallback(
+        (stepIndex: number): number | null => {
             const resolved = resolveWave(wave);
             const rch = resolved[stepIndex];
-            if (!rch || (rch !== '=' && (rch < '2' || rch > '9'))) return;
-            const di = dataIndexMap.get(stepIndex) ?? 0;
-            const current = data?.[di] ?? '';
-            const label = window.prompt('データラベルを入力してください:', current);
-            if (label !== null) {
-                setDataLabel(signalIndex, stepIndex, label);
+            if (!rch || (rch !== '=' && (rch < '2' || rch > '9'))) return null;
+            // '.' を遡って元のデータセルを探す
+            let src = stepIndex;
+            while (src > 0 && wave[src] === '.') src--;
+            return src;
+        },
+        [wave]
+    );
+
+    /** データセルとその後継続する '.' の合計セル数を返す */
+    const getDataSpan = useCallback(
+        (srcStep: number): number => {
+            let span = 1;
+            let j = srcStep + 1;
+            while (j < wave.length && wave[j] === '.') { span++; j++; }
+            return span;
+        },
+        [wave]
+    );
+
+    /** インライン編集を開く */
+    const openLabelEdit = useCallback(
+        (stepIndex: number) => {
+            const src = resolveDataSrcStep(stepIndex);
+            if (src === null) return;
+            const di = dataIndexMap.get(src) ?? 0;
+            setEditingDataStep(src);
+            setEditingLabel(data?.[di] ?? '');
+            // 次フレームで autoFocus が効くよう setTimeout
+            setTimeout(() => editInputRef.current?.select(), 0);
+        },
+        [resolveDataSrcStep, dataIndexMap, data]
+    );
+
+    /** インライン編集を確定する */
+    const commitLabelEdit = useCallback(() => {
+        if (editingDataStep !== null) {
+            setDataLabel(signalIndex, editingDataStep, editingLabel);
+            setEditingDataStep(null);
+        }
+    }, [editingDataStep, editingLabel, signalIndex, setDataLabel]);
+
+    /** インライン編集をキャンセルする */
+    const cancelLabelEdit = useCallback(() => {
+        setEditingDataStep(null);
+    }, []);
+
+    const handleDoubleClick = useCallback(
+        (_e: React.MouseEvent<SVGRectElement>, stepIndex: number) => {
+            openLabelEdit(stepIndex);
+        },
+        [openLabelEdit]
+    );
+
+    const handleContextMenu = useCallback(
+        (e: React.MouseEvent<SVGRectElement>, stepIndex: number) => {
+            const resolved = resolveWave(wave);
+            const rch = resolved[stepIndex];
+            // データセルの右クリック → ラベル編集（親の contextMenu への伝播を止める）
+            if (rch === '=' || (rch >= '2' && rch <= '9')) {
+                e.preventDefault();
+                e.stopPropagation();
+                openLabelEdit(stepIndex);
             }
         },
-        [wave, data, dataIndexMap, signalIndex, setDataLabel]
+        [wave, openLabelEdit]
     );
 
     const totalWidth = wave.length * CELL_WIDTH;
@@ -230,6 +291,7 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
                     style={{ cursor: 'crosshair' }}
                     onMouseDown={(e) => handleMouseDown(e, i)}
                     onDoubleClick={(e) => handleDoubleClick(e, i)}
+                    onContextMenu={(e) => handleContextMenu(e, i)}
                 />
             </g>
         );
@@ -257,6 +319,34 @@ const WaveRow: React.FC<WaveRowProps> = ({ signal, signalIndex, hoverStep }) => 
                 />
             ))}
             {segments}
+
+            {/* データラベルインライン編集入力 */}
+            {editingDataStep !== null && (() => {
+                const span = getDataSpan(editingDataStep);
+                const ex = editingDataStep * CELL_WIDTH;
+                const ew = CELL_WIDTH * span;
+                return (
+                    <foreignObject
+                        x={ex + 2}
+                        y={WAVE_TOP + 1}
+                        width={ew - 4}
+                        height={WAVE_BOT - WAVE_TOP - 2}
+                    >
+                        <input
+                            ref={editInputRef}
+                            className={styles.labelInput}
+                            value={editingLabel}
+                            autoFocus
+                            onChange={(e) => setEditingLabel(e.target.value)}
+                            onBlur={commitLabelEdit}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') { e.preventDefault(); commitLabelEdit(); }
+                                if (e.key === 'Escape') { e.preventDefault(); cancelLabelEdit(); }
+                            }}
+                        />
+                    </foreignObject>
+                );
+            })()}
         </svg>
     );
 };

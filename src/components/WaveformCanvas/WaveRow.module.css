@@ -30,3 +30,20 @@
 .dragContinue line {
     filter: brightness(1.25);
 }
+
+/** データラベルのインライン入力 */
+.labelInput {
+    width: 100%;
+    height: 100%;
+    padding: 0 4px;
+    box-sizing: border-box;
+    background: rgba(20, 30, 50, 0.92);
+    color: #e8e8e8;
+    border: 1px solid rgba(100, 180, 255, 0.7);
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: inherit;
+    text-align: center;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(74, 157, 240, 0.35);
+}
