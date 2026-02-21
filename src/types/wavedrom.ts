@@ -83,6 +83,8 @@ export interface AppState {
     stepSelection: { from: number; to: number; signalIndex?: number } | null;
     /** コピー/カット済みクリップボード */
     stepClipboard: StepClipboard | null;
+    /** 信号・グループのクリップボード */
+    itemClipboard: WaveSignalOrGroup | null;
 }
 
 /** デフォルトの初期波形データ */

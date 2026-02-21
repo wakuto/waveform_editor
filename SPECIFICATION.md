@@ -449,6 +449,7 @@ interface AppState {
 - [x] キーボードショートカット（`0`, `1`, `p`, `n`, `x`, `z`, `d`, `Ctrl+Z`, `Ctrl+Shift+Z`, `Ctrl+S`, `Delete`）
 - [x] LocalStorage自動保存（起動時復元）
 - [ ] ズーム / スクロール操作（Ctrl+ホイール）
+- [x] 信号・グループの複製
 
 ### Phase 3: 高度な機能
 - [x] 遷移線の高品質レンダリング

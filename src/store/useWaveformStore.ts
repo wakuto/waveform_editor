@@ -22,6 +22,9 @@ interface WaveformStore extends AppState {
     renameSignal: (index: number, name: string) => void;
     moveSignal: (fromIndex: number, toIndex: number) => void;
     moveItem: (fromPath: number[], toPath: number[]) => void;
+    duplicateItem: (path: number[]) => void;
+    copyItem: (path: number[]) => void;
+    pasteItem: (path: number[]) => void;
 
     // グループ管理
     addGroup: (name: string) => void;
@@ -417,6 +420,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     insertCursor: null,
     stepSelection: null,
     stepClipboard: null,
+    itemClipboard: null,
 
     setWaveformData: (data, pushHist = true) =>
         set((state) => ({
@@ -673,6 +677,88 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const toInfo = getArrayAndIndex(newSignals, adjustedToPath);
             if (!toInfo) return {};
             toInfo.array.splice(toInfo.index, 0, movedItem);
+
+            const newData = { ...prev, signal: newSignals };
+            return { waveformData: newData, ...pushHistory(state, prev) };
+        }),
+
+    duplicateItem: (path) =>
+        set((state) => {
+            const prev = state.waveformData;
+            const newSignals = JSON.parse(JSON.stringify(prev.signal)) as WaveSignalOrGroup[];
+
+            const getArrayAndIndex = (signals: WaveSignalOrGroup[], path: number[]) => {
+                let currentArray: WaveSignalOrGroup[] = signals;
+                for (let i = 0; i < path.length - 1; i++) {
+                    const next = currentArray[path[i]];
+                    if (!Array.isArray(next)) return null;
+                    currentArray = next as unknown as WaveSignalOrGroup[];
+                }
+                return { array: currentArray, index: path[path.length - 1] };
+            };
+
+            const info = getArrayAndIndex(newSignals, path);
+            if (!info) return {};
+
+            const targetItem = info.array[info.index];
+            const duplicatedItem = JSON.parse(JSON.stringify(targetItem)) as WaveSignalOrGroup;
+
+            const renameItem = (item: WaveSignalOrGroup) => {
+                if (Array.isArray(item)) {
+                    item[0] = item[0] + '_copy';
+                } else if (item && typeof (item as WaveSignal).wave === 'string') {
+                    (item as WaveSignal).name = (item as WaveSignal).name + '_copy';
+                }
+            };
+            renameItem(duplicatedItem);
+
+            info.array.splice(info.index + 1, 0, duplicatedItem);
+
+            const newData = { ...prev, signal: newSignals };
+            return { waveformData: newData, ...pushHistory(state, prev) };
+        }),
+
+    copyItem: (path) =>
+        set((state) => {
+            const prev = state.waveformData;
+            const getArrayAndIndex = (signals: WaveSignalOrGroup[], path: number[]) => {
+                let currentArray: WaveSignalOrGroup[] = signals;
+                for (let i = 0; i < path.length - 1; i++) {
+                    const next = currentArray[path[i]];
+                    if (!Array.isArray(next)) return null;
+                    currentArray = next as unknown as WaveSignalOrGroup[];
+                }
+                return { array: currentArray, index: path[path.length - 1] };
+            };
+            const info = getArrayAndIndex(prev.signal, path);
+            if (!info) return {};
+            const targetItem = info.array[info.index];
+            return { itemClipboard: JSON.parse(JSON.stringify(targetItem)) };
+        }),
+
+    pasteItem: (path) =>
+        set((state) => {
+            if (!state.itemClipboard) return {};
+            const prev = state.waveformData;
+            const newSignals = JSON.parse(JSON.stringify(prev.signal)) as WaveSignalOrGroup[];
+
+            const getArrayAndIndex = (signals: WaveSignalOrGroup[], path: number[]) => {
+                let currentArray: WaveSignalOrGroup[] = signals;
+                for (let i = 0; i < path.length - 1; i++) {
+                    const next = currentArray[path[i]];
+                    if (!Array.isArray(next)) return null;
+                    currentArray = next as unknown as WaveSignalOrGroup[];
+                }
+                return { array: currentArray, index: path[path.length - 1] };
+            };
+
+            const info = getArrayAndIndex(newSignals, path);
+            if (!info) return {};
+
+            const pastedItem = JSON.parse(JSON.stringify(state.itemClipboard)) as WaveSignalOrGroup;
+
+            // ペースト時は直後に挿入
+            info.array.splice(info.index + 1, 0, pastedItem);
 
             const newData = { ...prev, signal: newSignals };
             return { waveformData: newData, ...pushHistory(state, prev) };

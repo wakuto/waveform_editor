@@ -116,26 +116,42 @@ const WaveformCanvas: React.FC = () => {
         [moveItem]
     );
 
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        path: number[];
+        type: 'signal' | 'group';
+        name: string;
+        flatIndex?: number;
+        groupIndex?: number;
+    } | null>(null);
+
     const handleContextMenu = useCallback(
-        (e: React.MouseEvent, index: number) => {
+        (e: React.MouseEvent, path: number[], type: 'signal' | 'group', name: string, flatIndex?: number, groupIndex?: number) => {
             e.preventDefault();
-            if (window.confirm(`信号 "${signals[index].name}" を削除しますか？`)) removeSignal(index);
+            e.stopPropagation();
+            // 編集中の場合はコンテキストメニューを出さない
+            if (type === 'group' && editingGroupIndex === groupIndex) return;
+            if (type === 'signal' && editingIndex === flatIndex) return;
+
+            setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                path,
+                type,
+                name,
+                flatIndex,
+                groupIndex
+            });
         },
-        [signals, removeSignal]
+        [editingGroupIndex, editingIndex]
     );
 
-    const handleGroupContextMenu = useCallback(
-        (e: React.MouseEvent, groupIndex: number, groupName: string) => {
-            e.preventDefault();
-            // 編集中の場合はコンテキストメニューを出さない
-            if (editingGroupIndex === groupIndex) return;
-            if (window.confirm(`グループ "${groupName}" を削除しますか？`)) {
-                const removeGroup = useWaveformStore.getState().removeGroup;
-                if (removeGroup) removeGroup(groupIndex);
-            }
-        },
-        [editingGroupIndex]
-    );
+    React.useEffect(() => {
+        const handleClick = () => setContextMenu(null);
+        window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
+    }, []);
 
     const handleGroupDoubleClick = useCallback(
         (groupIndex: number, groupName: string) => {
@@ -414,7 +430,7 @@ const WaveformCanvas: React.FC = () => {
                                         }}
                                         onDragLeave={() => setDragOver(null)}
                                         onDoubleClick={() => handleGroupDoubleClick(currentGroupIndex, groupName)}
-                                        onContextMenu={(e) => handleGroupContextMenu(e, currentGroupIndex, groupName)}
+                                        onContextMenu={(e) => handleContextMenu(e, path, 'group', groupName, undefined, currentGroupIndex)}
                                     >
                                         {/* ネストの深さに応じたインジケーター */}
                                         {Array.from({ length: depth }).map((_, i) => (
@@ -469,7 +485,7 @@ const WaveformCanvas: React.FC = () => {
                                         handleDrop(path);
                                     }}
                                     onDragLeave={() => setDragOver(null)}
-                                    onContextMenu={(e) => handleContextMenu(e, idx)}
+                                    onContextMenu={(e) => handleContextMenu(e, path, 'signal', sig.name, idx, undefined)}
                                 >
                                     {/* 信号ラベル */}
                                     <div
@@ -578,6 +594,74 @@ const WaveformCanvas: React.FC = () => {
                     </button>
                 </div>
             </div>
+
+            {/* コンテキストメニュー */}
+            {contextMenu && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: contextMenu.y,
+                        left: contextMenu.x,
+                        background: '#2a2a4a',
+                        border: '1px solid #4a9df0',
+                        borderRadius: '4px',
+                        padding: '4px 0',
+                        zIndex: 1000,
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                        minWidth: '120px'
+                    }}
+                    onContextMenu={(e) => e.preventDefault()}
+                >
+                    <div
+                        className={styles.contextMenuItem}
+                        onClick={() => {
+                            useWaveformStore.getState().duplicateItem(contextMenu.path);
+                            setContextMenu(null);
+                        }}
+                    >
+                        複製 (Duplicate)
+                    </div>
+                    <div
+                        className={styles.contextMenuItem}
+                        onClick={() => {
+                            useWaveformStore.getState().copyItem(contextMenu.path);
+                            setContextMenu(null);
+                        }}
+                    >
+                        コピー (Copy)
+                    </div>
+                    <div
+                        className={`${styles.contextMenuItem} ${!useWaveformStore.getState().itemClipboard ? styles.contextMenuItemDisabled : ''}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (useWaveformStore.getState().itemClipboard) {
+                                useWaveformStore.getState().pasteItem(contextMenu.path);
+                            }
+                            setContextMenu(null);
+                        }}
+                    >
+                        ペースト (Paste)
+                    </div>
+                    <div style={{ height: '1px', background: '#4a9df0', margin: '4px 0', opacity: 0.3 }} />
+                    <div
+                        className={styles.contextMenuItem}
+                        style={{ color: '#ff6b6b' }}
+                        onClick={() => {
+                            if (window.confirm(`${contextMenu.type === 'group' ? 'グループ' : '信号'} "${contextMenu.name}" を削除しますか？`)) {
+                                if (contextMenu.type === 'group' && contextMenu.groupIndex !== undefined) {
+                                    const removeGroup = useWaveformStore.getState().removeGroup;
+                                    if (removeGroup) removeGroup(contextMenu.groupIndex);
+                                } else if (contextMenu.type === 'signal' && contextMenu.flatIndex !== undefined) {
+                                    removeSignal(contextMenu.flatIndex);
+                                }
+                            }
+                            setContextMenu(null);
+                        }}
+                    >
+                        削除 (Delete)
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

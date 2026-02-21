@@ -263,3 +263,27 @@
     z-index: 5;
     background: transparent;
 }
+
+/* ─── コンテキストメニュー ──────────────────────────────────── */
+.contextMenuItem {
+    padding: 6px 12px;
+    font-size: 12px;
+    color: #e0e0e0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.contextMenuItem:hover {
+    background: #4a9df0;
+    color: #fff;
+}
+
+.contextMenuItemDisabled {
+    color: #666;
+    cursor: not-allowed;
+}
+
+.contextMenuItemDisabled:hover {
+    background: transparent;
+    color: #666;
+}
