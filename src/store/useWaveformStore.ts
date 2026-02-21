@@ -80,15 +80,78 @@ function deleteStepsFromSignal(sig: WaveSignal, from: number, to: number): WaveS
             else if (i <= to) dataCountInRange++;
         }
     }
-    const newWave = wave.slice(0, from) + wave.slice(to + 1);
+
+    // 削除範囲の直後の状態を解決しておく（復元用）
+    let afterChar = '.';
+    let afterData: string | undefined = undefined;
+    if (to + 1 < wave.length && wave[to + 1] === '.') {
+        for (let i = to; i >= 0; i--) {
+            const ch = wave[i];
+            if (ch !== '.' && ch !== '|') {
+                afterChar = ch;
+                if (ch === '=' || (ch >= '2' && ch <= '9')) {
+                    let dataIdx = 0;
+                    for (let j = 0; j <= i; j++) {
+                        const c = wave[j];
+                        if (c === '=' || (c >= '2' && c <= '9')) dataIdx++;
+                    }
+                    if (sig.data && dataIdx - 1 >= 0 && dataIdx - 1 < sig.data.length) {
+                        afterData = sig.data[dataIdx - 1];
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    let newWave = wave.slice(0, from) + wave.slice(to + 1);
     const data = sig.data ? [...sig.data] : [];
     if (dataCountInRange > 0) data.splice(dataCountBefore, dataCountInRange);
+
+    // 削除範囲の直後が '.' だった場合、元の状態を復元する
+    if (to + 1 < wave.length && wave[to + 1] === '.') {
+        // 削除後の波形において、from の直前の状態を解決する
+        let currentPrevChar = '.';
+        let currentPrevData: string | undefined = undefined;
+        for (let i = from - 1; i >= 0; i--) {
+            const ch = newWave[i];
+            if (ch !== '.' && ch !== '|') {
+                currentPrevChar = ch;
+                if (ch === '=' || (ch >= '2' && ch <= '9')) {
+                    let dataIdx = 0;
+                    for (let j = 0; j <= i; j++) {
+                        const c = newWave[j];
+                        if (c === '=' || (c >= '2' && c <= '9')) dataIdx++;
+                    }
+                    if (dataIdx - 1 >= 0 && dataIdx - 1 < data.length) {
+                        currentPrevData = data[dataIdx - 1];
+                    }
+                }
+                break;
+            }
+        }
+
+        // 元の直前の状態 (afterChar, afterData) と異なる場合、復元する
+        if (currentPrevChar !== afterChar || (currentPrevChar === '=' || (currentPrevChar >= '2' && currentPrevChar <= '9') ? currentPrevData !== afterData : false)) {
+            newWave = newWave.slice(0, from) + afterChar + newWave.slice(from + 1);
+            if (afterChar === '=' || (afterChar >= '2' && afterChar <= '9')) {
+                // from までのデータセルの数を数える
+                let dataIdx = 0;
+                for (let j = 0; j < from; j++) {
+                    const c = newWave[j];
+                    if (c === '=' || (c >= '2' && c <= '9')) dataIdx++;
+                }
+                data.splice(dataIdx, 0, afterData ?? '');
+            }
+        }
+    }
+
     return { ...sig, wave: newWave, data: data.length > 0 ? data : undefined };
 }
 
 /** wave の from〜to の wave スライスと対応する data エントリを抽出する */
 function copyStepsFromSignal(sig: WaveSignal, from: number, to: number): { wave: string; data: string[] | undefined } {
-    const waveSlice = sig.wave.slice(from, to + 1);
+    let waveSlice = sig.wave.slice(from, to + 1);
     let dataStart = 0;
     let dataCount = 0;
     for (let i = 0; i < sig.wave.length; i++) {
@@ -99,8 +162,41 @@ function copyStepsFromSignal(sig: WaveSignal, from: number, to: number): { wave:
             else if (i <= to) dataCount++;
         }
     }
-    const data = sig.data ? sig.data.slice(dataStart, dataStart + dataCount) : undefined;
-    return { wave: waveSlice, data: data && data.length > 0 ? data : undefined };
+
+    let data = sig.data ? sig.data.slice(dataStart, dataStart + dataCount) : [];
+
+    // 先頭が '.' の場合、直前の有効な状態を解決する
+    if (waveSlice.startsWith('.')) {
+        let resolvedChar = '.';
+        let resolvedData: string | undefined = undefined;
+
+        for (let i = from - 1; i >= 0; i--) {
+            const ch = sig.wave[i];
+            if (ch !== '.' && ch !== '|') {
+                resolvedChar = ch;
+                if (ch === '=' || (ch >= '2' && ch <= '9')) {
+                    // 直前のデータセルのインデックスは dataStart - 1
+                    if (sig.data && dataStart - 1 >= 0 && dataStart - 1 < sig.data.length) {
+                        resolvedData = sig.data[dataStart - 1];
+                    }
+                }
+                break;
+            }
+        }
+
+        if (resolvedChar !== '.') {
+            waveSlice = resolvedChar + waveSlice.slice(1);
+            if (resolvedChar === '=' || (resolvedChar >= '2' && resolvedChar <= '9')) {
+                if (resolvedData !== undefined) {
+                    data.unshift(resolvedData);
+                } else {
+                    data.unshift(''); // ラベルがない場合のフォールバック
+                }
+            }
+        }
+    }
+
+    return { wave: waveSlice, data: data.length > 0 ? data : undefined };
 }
 
 /** wave の position に clipWave を挿入し、対応する data エントリも挿入する */
@@ -111,11 +207,92 @@ function pasteStepsIntoSignal(sig: WaveSignal, position: number, clipWave: strin
         const ch = wave[i];
         if (ch === '=' || (ch >= '2' && ch <= '9')) dataCountBefore++;
     }
-    const newWave = wave.slice(0, position) + clipWave + wave.slice(position);
-    const data = sig.data ? [...sig.data] : [];
-    if (clipData && clipData.length > 0) {
-        data.splice(dataCountBefore, 0, ...clipData);
+
+    // ペースト先の直前の状態を解決する
+    let prevChar = '.';
+    let prevData: string | undefined = undefined;
+    for (let i = position - 1; i >= 0; i--) {
+        const ch = wave[i];
+        if (ch !== '.' && ch !== '|') {
+            prevChar = ch;
+            if (ch === '=' || (ch >= '2' && ch <= '9')) {
+                // 直前のデータセルのインデックスを計算
+                let dataIdx = 0;
+                for (let j = 0; j <= i; j++) {
+                    const c = wave[j];
+                    if (c === '=' || (c >= '2' && c <= '9')) dataIdx++;
+                }
+                if (sig.data && dataIdx - 1 >= 0 && dataIdx - 1 < sig.data.length) {
+                    prevData = sig.data[dataIdx - 1];
+                }
+            }
+            break;
+        }
     }
+
+    // ペーストする波形の先頭が解決済みの値で、かつペースト先の直前の状態と同じ場合は '.' に戻す
+    let finalClipWave = clipWave;
+    let finalClipData = clipData ? [...clipData] : [];
+
+    if (clipWave.length > 0 && clipWave[0] !== '.' && clipWave[0] !== '|') {
+        const firstChar = clipWave[0];
+        const isData = firstChar === '=' || (firstChar >= '2' && firstChar <= '9');
+
+        if (firstChar === prevChar) {
+            if (!isData || (isData && finalClipData.length > 0 && finalClipData[0] === prevData)) {
+                finalClipWave = '.' + clipWave.slice(1);
+                if (isData && finalClipData.length > 0) {
+                    finalClipData.shift();
+                }
+            }
+        }
+    }
+
+    let newWave = wave.slice(0, position) + finalClipWave + wave.slice(position);
+    let data = sig.data ? [...sig.data] : [];
+    if (finalClipData && finalClipData.length > 0) {
+        data.splice(dataCountBefore, 0, ...finalClipData);
+    }
+
+    // ペースト範囲の直後の文字が '.' の場合、元の状態を復元する必要があるかチェック
+    const afterIdx = position + finalClipWave.length;
+    if (afterIdx < newWave.length && newWave[afterIdx] === '.') {
+        // 挿入後の波形において、afterIdx の直前の状態を解決する
+        let currentPrevChar = '.';
+        let currentPrevData: string | undefined = undefined;
+        for (let i = afterIdx - 1; i >= 0; i--) {
+            const ch = newWave[i];
+            if (ch !== '.' && ch !== '|') {
+                currentPrevChar = ch;
+                if (ch === '=' || (ch >= '2' && ch <= '9')) {
+                    let dataIdx = 0;
+                    for (let j = 0; j <= i; j++) {
+                        const c = newWave[j];
+                        if (c === '=' || (c >= '2' && c <= '9')) dataIdx++;
+                    }
+                    if (dataIdx - 1 >= 0 && dataIdx - 1 < data.length) {
+                        currentPrevData = data[dataIdx - 1];
+                    }
+                }
+                break;
+            }
+        }
+
+        // 元の直前の状態 (prevChar, prevData) と異なる場合、復元する
+        if (currentPrevChar !== prevChar || (currentPrevChar === '=' || (currentPrevChar >= '2' && currentPrevChar <= '9') ? currentPrevData !== prevData : false)) {
+            newWave = newWave.slice(0, afterIdx) + prevChar + newWave.slice(afterIdx + 1);
+            if (prevChar === '=' || (prevChar >= '2' && prevChar <= '9')) {
+                // afterIdx までのデータセルの数を数える
+                let dataIdx = 0;
+                for (let j = 0; j < afterIdx; j++) {
+                    const c = newWave[j];
+                    if (c === '=' || (c >= '2' && c <= '9')) dataIdx++;
+                }
+                data.splice(dataIdx, 0, prevData ?? '');
+            }
+        }
+    }
+
     return { ...sig, wave: newWave, data: data.length > 0 ? data : undefined };
 }
 
@@ -430,17 +607,32 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
 
     pasteAtCursor: () =>
         set((state) => {
-            const cursor = state.insertCursor;
             const clipboard = state.stepClipboard;
-            if (cursor === null || !clipboard) return {};
+            if (!clipboard) return {};
+
             const prev = state.waveformData;
             const flatSignals = getSignalList(prev.signal);
+
+            // 選択範囲がある場合は、その範囲を削除してからペーストする（上書きペースト）
+            let targetCursor = state.insertCursor;
+            let baseSignals = prev.signal;
+
+            if (state.stepSelection) {
+                const { from, to } = state.stepSelection;
+                targetCursor = from;
+                baseSignals = mapAllSignals(prev.signal, (sig) =>
+                    deleteStepsFromSignal(sig, from, to)
+                );
+            }
+
+            if (targetCursor === null) return {};
+
             let clipIdx = 0;
-            const newSignals = mapAllSignals(prev.signal, (sig) => {
+            const newSignals = mapAllSignals(baseSignals, (sig) => {
                 const idx = flatSignals.indexOf(sig);
                 const clipWave = clipboard.waves[idx] ?? '.'.repeat(clipboard.waves[0]?.length ?? 1);
                 const clipData = clipboard.dataSlices[idx];
-                const result = pasteStepsIntoSignal(sig, cursor, clipWave, clipData);
+                const result = pasteStepsIntoSignal(sig, targetCursor!, clipWave, clipData);
                 clipIdx++;
                 return result;
             });
@@ -449,7 +641,8 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const newData = { ...prev, signal: newSignals };
             return {
                 waveformData: newData,
-                insertCursor: cursor + pasteLen,
+                insertCursor: targetCursor + pasteLen,
+                stepSelection: null, // ペースト後は選択範囲をクリア
                 ...pushHistory(state, prev),
             };
         }),
