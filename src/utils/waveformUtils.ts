@@ -99,7 +99,7 @@ export function getSegmentPath(
     x: number,
     width: number,
     isContinue = false,
-    isNextContinue = false
+    _isNextContinue = false
 ): SegmentPath {
     const t = WAVE_TOP;
     const m = WAVE_MID;
@@ -241,7 +241,6 @@ function buildBoxSegment(
     fillColor: string
 ): SegmentPath {
     const t = WAVE_TOP;
-    const m = WAVE_MID;
     const b = WAVE_BOT;
     const slope = 4 * (width / BASE_CELL_WIDTH);
     const x1 = x + width;

@@ -416,8 +416,9 @@ function updateFlatSignal(
 
     // undefined のプロパティは削除する
     Object.keys(newFlat[flatIndex]).forEach(key => {
-        if ((newFlat[flatIndex] as any)[key] === undefined) {
-            delete (newFlat[flatIndex] as any)[key];
+        const targetObj = newFlat[flatIndex] as unknown as Record<string, unknown>;
+        if (targetObj[key] === undefined) {
+            delete targetObj[key];
         }
     });
 
