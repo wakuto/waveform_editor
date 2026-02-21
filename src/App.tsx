@@ -4,6 +4,7 @@ import WaveformCanvas from './components/WaveformCanvas/WaveformCanvas';
 import JsonEditor from './components/JsonEditor/JsonEditor';
 import StatusBar from './components/StatusBar/StatusBar';
 import { useWaveformStore } from './store/useWaveformStore';
+import { formatWaveDromJSON } from './utils/jsonFormatter';
 import type { WaveTool } from './types/wavedrom';
 import styles from './App.module.css';
 
@@ -71,7 +72,7 @@ const App: React.FC = () => {
         if ((e.key === 'z' && e.shiftKey) || e.key === 'Z') { e.preventDefault(); redo(); return; }
         if (e.key === 's') {
           e.preventDefault();
-          const json = JSON.stringify(waveformData, null, 2);
+          const json = formatWaveDromJSON(waveformData);
           const blob = new Blob([json], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');

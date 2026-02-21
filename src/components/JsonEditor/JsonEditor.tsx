@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useWaveformStore } from '../../store/useWaveformStore';
+import { formatWaveDromJSON } from '../../utils/jsonFormatter';
 import styles from './JsonEditor.module.css';
 
 const JsonEditor: React.FC = () => {
     const waveformData = useWaveformStore((s) => s.waveformData);
     const setWaveformData = useWaveformStore((s) => s.setWaveformData);
 
-    const [text, setText] = useState(() => JSON.stringify(waveformData, null, 2));
+    const [text, setText] = useState(() => formatWaveDromJSON(waveformData));
     const [error, setError] = useState<string | null>(null);
 
     // 波形データが外部から変更されたときにテキストを更新
     useEffect(() => {
-        setText(JSON.stringify(waveformData, null, 2));
+        setText(formatWaveDromJSON(waveformData));
         setError(null);
     }, [waveformData]);
 

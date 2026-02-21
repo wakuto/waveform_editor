@@ -20,6 +20,8 @@ const TOOLS: { key: WaveTool; label: string; title: string }[] = [
     { key: '|', label: '|', title: 'Gap' },
 ];
 
+import { formatWaveDromJSON } from '../../utils/jsonFormatter';
+
 const Toolbar: React.FC = () => {
     const selectedTool = useWaveformStore((s) => s.selectedTool);
     const setSelectedTool = useWaveformStore((s) => s.setSelectedTool);
@@ -75,7 +77,7 @@ const Toolbar: React.FC = () => {
 
     /** 保存（ダウンロード） */
     const handleSave = useCallback(() => {
-        const json = JSON.stringify(waveformData, null, 2);
+        const json = formatWaveDromJSON(waveformData);
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
