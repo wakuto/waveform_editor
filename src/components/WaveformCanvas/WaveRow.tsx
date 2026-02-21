@@ -397,7 +397,7 @@ function getStrokeColor(ch: string): string {
     if (ch === 'x') return '#e05555';
     if (ch === 'z') return '#55aaee';
     if (ch === '0' || ch === '1') return '#88cc88';
-    if (ch === 'p' || ch === 'n') return '#88cc88';
+    if (ch === 'p' || ch === 'n' || ch === 'P' || ch === 'N') return '#88cc88';
     if (ch === '=' || (ch >= '2' && ch <= '9')) return DATA_COLORS[ch] ?? '#4a9df0';
     return '#aaaaaa';
 }

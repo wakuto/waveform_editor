@@ -6,6 +6,8 @@ export type WaveChar =
     | '1' // High
     | 'p' // Positive Edge Clock
     | 'n' // Negative Edge Clock
+    | 'P' // Positive Edge Trigger
+    | 'N' // Negative Edge Trigger
     | 'z' // High-Z
     | 'x' // Undefined
     | '=' // Data (default color)

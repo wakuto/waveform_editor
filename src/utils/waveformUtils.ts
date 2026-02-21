@@ -62,7 +62,7 @@ function getPrevY(prev: PrevChar): number[] {
     if (prev === '0') return [WAVE_BOT];
     if (prev === '1') return [WAVE_TOP];
     if (prev === 'z') return [WAVE_MID];
-    if (prev === 'p' || prev === 'n') return [WAVE_BOT]; // クロックは下で終わる
+    if (prev === 'p' || prev === 'n' || prev === 'P' || prev === 'N') return [WAVE_BOT]; // クロックは下で終わる
     if (isDataChar(prev) || prev === 'x') return [WAVE_TOP, WAVE_BOT];
     return [WAVE_BOT];
 }
@@ -152,9 +152,9 @@ export function getSegmentPath(
         return { d: `M${x0} ${t} L${x1} ${t} M${x0} ${b} L${x1} ${b}` };
     }
 
-    // ─── Positive Edge Clock (p) ──────────────────────────────────────
-    if (char === 'p') {
-        const isFirstP = prev !== 'p';
+    // ─── Positive Edge Clock (p, P) ──────────────────────────────────────
+    if (char === 'p' || char === 'P') {
+        const isFirstP = prev !== 'p' && prev !== 'P';
         let d = '';
         if (isFirstP) {
             const prevY = getPrevY(prev);
@@ -163,12 +163,19 @@ export function getSegmentPath(
         } else {
             d = `M${x0} ${b} L${x0} ${t} L${xm} ${t} L${xm} ${b} L${x1} ${b}`;
         }
+
+        // P の場合は矢印（トリガー）を描画
+        if (char === 'P') {
+            const arrow = `M${x0 - 3} ${m + 3} L${x0} ${m - 3} L${x0 + 3} ${m + 3}`;
+            d += ` ${arrow}`;
+        }
+
         return { d: d.trim() };
     }
 
-    // ─── Negative Edge Clock (n) ──────────────────────────────────────
-    if (char === 'n') {
-        const isFirstN = prev !== 'n';
+    // ─── Negative Edge Clock (n, N) ──────────────────────────────────────
+    if (char === 'n' || char === 'N') {
+        const isFirstN = prev !== 'n' && prev !== 'N';
         let d = '';
         if (isFirstN) {
             const prevY = getPrevY(prev);
@@ -177,6 +184,13 @@ export function getSegmentPath(
         } else {
             d = `M${x0} ${t} L${x0} ${b} L${xm} ${b} L${xm} ${t} L${x1} ${t}`;
         }
+
+        // N の場合は矢印（トリガー）を描画
+        if (char === 'N') {
+            const arrow = `M${x0 - 3} ${m - 3} L${x0} ${m + 3} L${x0 + 3} ${m - 3}`;
+            d += ` ${arrow}`;
+        }
+
         return { d: d.trim() };
     }
 

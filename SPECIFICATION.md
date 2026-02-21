@@ -80,6 +80,8 @@ WaveDromライブラリは波形の「表示」には優れているが、以下
 | **High** | `1` | 論理1 |
 | **Positive Edge Clock** | `p` | 立ち上がりエッジクロック |
 | **Negative Edge Clock** | `n` | 立ち下がりエッジクロック |
+| **Positive Edge Trigger** | `P` | 立ち上がりエッジトリガー（矢印付き） |
+| **Negative Edge Trigger** | `N` | 立ち下がりエッジトリガー（矢印付き） |
 | **High-Z** | `z` | ハイインピーダンス |
 | **Undefined** | `x` | 不定値 |
 | **Data (色付き)** | `=`, `2`〜`9` | データバス（ラベル付与可能） |
@@ -493,11 +495,11 @@ interface AppState {
   - `x` / Data の左端 `<`・右端 `>` スパイク＋正確な塗りつぶし多角形
   - `.`（継続）の境界線なし延長と `isContinue` / `isNextContinue` による制御
 - [x] エッジリレーション（矢印）のGUI編集
-- [ ] `head` / `foot` / `config` のGUI設定
+- [x] `head` / `foot` / `config` のGUI設定
 - [x] SVGエクスポート
 - [x] PNGエクスポート
 - [x] タイムステップ選択ツール（サイクル範囲選択・挿入カーソル・カーソル位置への挿入・削除・コピー・カット・ペースト）
-- [ ] WaveDromレンダリング結果との見た目比較・検証
+- [x] WaveDromレンダリング結果との見た目比較・検証
 
 ## 11. 用語集
 

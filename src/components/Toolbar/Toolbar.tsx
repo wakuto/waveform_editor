@@ -10,6 +10,8 @@ const TOOLS: { key: WaveTool; label: string; title: string }[] = [
     { key: '1', label: '1', title: 'High' },
     { key: 'p', label: 'p', title: 'Posedge Clock' },
     { key: 'n', label: 'n', title: 'Negedge Clock' },
+    { key: 'P', label: 'P', title: 'Posedge Trigger' },
+    { key: 'N', label: 'N', title: 'Negedge Trigger' },
     { key: 'z', label: 'z', title: 'High-Z' },
     { key: 'x', label: 'x', title: 'Undefined' },
     { key: '=', label: '=', title: 'Data' },
