@@ -120,22 +120,63 @@ const WaveformCanvas: React.FC = () => {
 
     // ─── 信号ドラッグ並べ替え ────────────────────────────────────────
     const handleDragStart = useCallback((path: number[]) => { dragPathRef.current = path; }, []);
-    const handleDragOver = useCallback((e: React.DragEvent, path: number[]) => {
+    const handleDragOver = useCallback((e: React.DragEvent, path: number[], type: 'group' | 'signal') => {
         e.preventDefault();
         if (path.length === 1 && path[0] === -1) {
             setDragOver('root');
+            return;
+        }
+
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const height = rect.height;
+
+        if (type === 'group') {
+            if (y < height * 0.3) {
+                setDragOver(`${path.join(',')}-before`);
+            } else if (y > height * 0.7) {
+                setDragOver(`${path.join(',')}-after`);
+            } else {
+                setDragOver(`${path.join(',')}-inside`);
+            }
         } else {
-            setDragOver(path.join(','));
+            if (y < height / 2) {
+                setDragOver(`${path.join(',')}-before`);
+            } else {
+                setDragOver(`${path.join(',')}-after`);
+            }
         }
     }, []);
     const handleDrop = useCallback(
-        (toPath: number[]) => {
-            if (dragPathRef.current !== null && dragPathRef.current.join(',') !== toPath.join(',')) {
+        (e: React.DragEvent, path: number[], type: 'group' | 'signal', childrenLength?: number) => {
+            e.stopPropagation();
+            if (dragPathRef.current === null) return;
+
+            let toPath = [...path];
+            const pathStr = path.join(',');
+
+            if (dragOver === `${pathStr}-before`) {
+                // そのまま (path)
+            } else if (dragOver === `${pathStr}-after`) {
+                // 次のインデックス
+                toPath[toPath.length - 1]++;
+            } else if (dragOver === `${pathStr}-inside` && type === 'group') {
+                // グループの中の末尾 (インデックス0はグループ名なので、子要素は1から始まる)
+                toPath = [...path, (childrenLength || 0) + 1];
+            } else if (dragOver === 'root') {
+                toPath = [-1]; // rootの末尾
+            } else {
+                // dragOverが一致しない場合は何もしない
+                dragPathRef.current = null; setDragOver(null);
+                return;
+            }
+
+            if (dragPathRef.current.join(',') !== toPath.join(',')) {
                 moveItem(dragPathRef.current, toPath);
             }
             dragPathRef.current = null; setDragOver(null);
         },
-        [moveItem]
+        [moveItem, dragOver]
     );
 
     const [contextMenu, setContextMenu] = useState<{
@@ -600,7 +641,7 @@ const WaveformCanvas: React.FC = () => {
             </div>
 
             {/* 信号行 + オーバーレイ */}
-            <div className={styles.rows} style={{ position: 'relative' }}>
+            <div className={`${styles.rows} ${dragOver === 'root' ? styles.dragOverRoot : ''}`} style={{ position: 'relative' }}>
                 {(() => {
                     let flatIndex = 0;
                     let groupIndex = 0;
@@ -612,19 +653,18 @@ const WaveformCanvas: React.FC = () => {
                             return (
                                 <div key={`group-${currentGroupIndex}`} className={styles.groupContainer}>
                                     <div
-                                        className={`${styles.groupHeader} ${dragOver === pathStr ? styles.groupHeaderDragOver : ''}`}
+                                        className={`${styles.groupHeader} ${dragOver === `${pathStr}-before` ? styles.dragOverBefore :
+                                                dragOver === `${pathStr}-after` ? styles.dragOverAfter :
+                                                    dragOver === `${pathStr}-inside` ? styles.dragOverInside : ''
+                                            }`}
                                         style={{ paddingLeft: `${depth * 12 + 8}px` }}
                                         draggable
                                         onDragStart={(e) => {
                                             e.stopPropagation();
                                             handleDragStart(path);
                                         }}
-                                        onDragOver={(e) => handleDragOver(e, path)}
-                                        onDrop={(e) => {
-                                            e.stopPropagation();
-                                            // グループにドロップした場合は、そのグループの末尾に追加する
-                                            handleDrop([...path, children.length + 1]);
-                                        }}
+                                        onDragOver={(e) => handleDragOver(e, path, 'group')}
+                                        onDrop={(e) => handleDrop(e, path, 'group', children.length)}
                                         onDragLeave={() => setDragOver(null)}
                                         onDoubleClick={() => handleGroupDoubleClick(currentGroupIndex, groupName)}
                                         onContextMenu={(e) => handleContextMenu(e, path, 'group', groupName, undefined, currentGroupIndex)}
@@ -675,14 +715,13 @@ const WaveformCanvas: React.FC = () => {
                             return (
                                 <div
                                     key={`sig-${idx}`}
-                                    className={`${styles.row} ${depth > 0 ? styles.rowInGroup : ''} ${selectedSignalIndex === idx ? styles.selected : ''} ${dragOver === pathStr ? styles.dragOver : ''}`}
+                                    className={`${styles.row} ${depth > 0 ? styles.rowInGroup : ''} ${selectedSignalIndex === idx ? styles.selected : ''} ${dragOver === `${pathStr}-before` ? styles.dragOverBefore :
+                                            dragOver === `${pathStr}-after` ? styles.dragOverAfter : ''
+                                        }`}
                                     style={{ height: ROW_HEIGHT }}
                                     onClick={() => setSelectedSignalIndex(idx)}
-                                    onDragOver={(e) => handleDragOver(e, path)}
-                                    onDrop={(e) => {
-                                        e.stopPropagation();
-                                        handleDrop(path);
-                                    }}
+                                    onDragOver={(e) => handleDragOver(e, path, 'signal')}
+                                    onDrop={(e) => handleDrop(e, path, 'signal')}
                                     onDragLeave={() => setDragOver(null)}
                                 >
                                     {/* 信号ラベル */}
@@ -771,12 +810,9 @@ const WaveformCanvas: React.FC = () => {
 
                 {/* 信号追加ボタン */}
                 <div
-                    className={`${styles.addRow} ${dragOver === 'root' ? styles.dragOver : ''}`}
-                    onDragOver={(e) => handleDragOver(e, [-1])} // -1 はルートを示すダミー
-                    onDrop={(e) => {
-                        e.stopPropagation();
-                        handleDrop([waveformData.signal.length]);
-                    }}
+                    className={`${styles.addRow} ${dragOver === 'root' ? styles.dragOverRoot : ''}`}
+                    onDragOver={(e) => handleDragOver(e, [-1], 'signal')} // -1 はルートを示すダミー
+                    onDrop={(e) => handleDrop(e, [-1], 'signal')}
                     onDragLeave={() => setDragOver(null)}
                 >
                     <button className={styles.addButton} onClick={() => addSignal()}>

@@ -71,10 +71,6 @@
     background: rgba(74, 157, 240, 0.08) !important;
 }
 
-.dragOver {
-    border-top: 2px solid #4a9df0;
-}
-
 .label {
     display: flex;
     align-items: center;
@@ -154,10 +150,22 @@
     background: #25345a;
 }
 
-.groupHeaderDragOver {
+.dragOverBefore {
+    border-top: 2px solid #4a9df0;
+}
+
+.dragOverAfter {
+    border-bottom: 2px solid #4a9df0;
+}
+
+.dragOverInside {
     background: rgba(74, 157, 240, 0.2);
     border: 1px dashed #4a9df0;
     box-sizing: border-box;
+}
+
+.dragOverRoot {
+    border-bottom: 2px solid #4a9df0;
 }
 
 .groupIcon {

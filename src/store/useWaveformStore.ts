@@ -737,6 +737,12 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
 
             const toInfo = getArrayAndIndex(newSignals, adjustedToPath);
             if (!toInfo) return {};
+
+            // -1 の場合は末尾に追加
+            if (toInfo.index === -1) {
+                toInfo.index = toInfo.array.length;
+            }
+
             toInfo.array.splice(toInfo.index, 0, movedItem);
 
             const newData = { ...prev, signal: newSignals };
