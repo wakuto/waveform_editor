@@ -75,6 +75,8 @@ export interface AppState {
     selectedTool: WaveTool;
     selectedSignalIndex: number | null;
     jsonPanelVisible: boolean;
+    previewVisible: boolean;
+    configPanelVisible: boolean;
     hoverInfo: { signalIndex: number; stepIndex: number } | null;
     editingDataCell: { signalIndex: number; stepIndex: number } | null;
     statusMessage: string;

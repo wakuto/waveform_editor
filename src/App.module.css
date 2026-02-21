@@ -13,3 +13,10 @@
     flex: 1;
     overflow: hidden;
 }
+
+.canvasArea {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}

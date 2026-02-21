@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import Toolbar from './components/Toolbar/Toolbar';
 import WaveformCanvas from './components/WaveformCanvas/WaveformCanvas';
 import JsonEditor from './components/JsonEditor/JsonEditor';
+import ConfigPanel from './components/ConfigPanel/ConfigPanel';
+import PreviewPanel from './components/PreviewPanel/PreviewPanel';
 import StatusBar from './components/StatusBar/StatusBar';
 import { useWaveformStore } from './store/useWaveformStore';
 import { formatWaveDromJSON } from './utils/jsonFormatter';
@@ -23,6 +25,8 @@ const KEY_TOOL_MAP: Record<string, WaveTool> = {
 
 const App: React.FC = () => {
   const jsonPanelVisible = useWaveformStore((s) => s.jsonPanelVisible);
+  const previewVisible = useWaveformStore((s) => s.previewVisible);
+  const configPanelVisible = useWaveformStore((s) => s.configPanelVisible);
   const undo = useWaveformStore((s) => s.undo);
   const redo = useWaveformStore((s) => s.redo);
   const setSelectedTool = useWaveformStore((s) => s.setSelectedTool);
@@ -125,7 +129,11 @@ const App: React.FC = () => {
     <div className={styles.app}>
       <Toolbar />
       <div className={styles.main}>
-        <WaveformCanvas />
+        <div className={styles.canvasArea}>
+          <WaveformCanvas />
+          {previewVisible && <PreviewPanel />}
+        </div>
+        {configPanelVisible && <ConfigPanel />}
         {jsonPanelVisible && <JsonEditor />}
       </div>
       <StatusBar />

@@ -29,6 +29,10 @@ const Toolbar: React.FC = () => {
     const waveformData = useWaveformStore((s) => s.waveformData);
     const jsonPanelVisible = useWaveformStore((s) => s.jsonPanelVisible);
     const setJsonPanelVisible = useWaveformStore((s) => s.setJsonPanelVisible);
+    const previewVisible = useWaveformStore((s) => s.previewVisible);
+    const setPreviewVisible = useWaveformStore((s) => s.setPreviewVisible);
+    const configPanelVisible = useWaveformStore((s) => s.configPanelVisible);
+    const setConfigPanelVisible = useWaveformStore((s) => s.setConfigPanelVisible);
     const undo = useWaveformStore((s) => s.undo);
     const redo = useWaveformStore((s) => s.redo);
     const canUndo = useWaveformStore((s) => s.canUndo);
@@ -191,8 +195,22 @@ const Toolbar: React.FC = () => {
 
             <div className={styles.separator} />
 
-            {/* JSONパネルトグル */}
+            {/* パネルトグル */}
             <div className={styles.group}>
+                <button
+                    className={`${styles.btn} ${configPanelVisible ? styles.active : ''}`}
+                    onClick={() => setConfigPanelVisible(!configPanelVisible)}
+                    title="設定パネルを表示/非表示"
+                >
+                    ⚙ 設定
+                </button>
+                <button
+                    className={`${styles.btn} ${previewVisible ? styles.active : ''}`}
+                    onClick={() => setPreviewVisible(!previewVisible)}
+                    title="WaveDromプレビューを表示/非表示"
+                >
+                    👁 プレビュー
+                </button>
                 <button
                     className={`${styles.btn} ${jsonPanelVisible ? styles.active : ''}`}
                     onClick={() => setJsonPanelVisible(!jsonPanelVisible)}

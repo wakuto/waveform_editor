@@ -55,6 +55,8 @@ interface WaveformStore extends AppState {
     setSelectedTool: (tool: WaveTool) => void;
     setSelectedSignalIndex: (index: number | null) => void;
     setJsonPanelVisible: (visible: boolean) => void;
+    setPreviewVisible: (visible: boolean) => void;
+    setConfigPanelVisible: (visible: boolean) => void;
     setHoverInfo: (info: { signalIndex: number; stepIndex: number } | null) => void;
     setEditingDataCell: (cell: { signalIndex: number; stepIndex: number } | null) => void;
     openDataLabelEdit: (signalIndex: number, stepIndex: number) => void;
@@ -420,6 +422,8 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     selectedTool: '1',
     selectedSignalIndex: null,
     jsonPanelVisible: false,
+    previewVisible: false,
+    configPanelVisible: false,
     hoverInfo: null,
     editingDataCell: null,
     statusMessage: '',
@@ -895,6 +899,8 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     })),
     setSelectedSignalIndex: (index) => set({ selectedSignalIndex: index }),
     setJsonPanelVisible: (visible) => set({ jsonPanelVisible: visible }),
+    setPreviewVisible: (visible) => set({ previewVisible: visible }),
+    setConfigPanelVisible: (visible) => set({ configPanelVisible: visible }),
     setHoverInfo: (info) => set({ hoverInfo: info }),
     setEditingDataCell: (cell) => set({ editingDataCell: cell }),
     openDataLabelEdit: (signalIndex, stepIndex) => {

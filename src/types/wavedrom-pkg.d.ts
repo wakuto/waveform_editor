@@ -13,7 +13,7 @@ declare module 'wavedrom' {
         tt(...args: unknown[]): unknown;
     };
 
-    const waveSkin: Record<string, unknown>;
+    const waveSkin: Record<string, Record<string, unknown>>;
 
     export { renderAny, onml, waveSkin };
 }

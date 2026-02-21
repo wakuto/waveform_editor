@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useWaveformStore } from '../../store/useWaveformStore';
-import { getSignalList, BASE_CELL_WIDTH, ROW_HEIGHT } from '../../utils/waveformUtils';
+import { getSignalList, BASE_CELL_WIDTH } from '../../utils/waveformUtils';
 import styles from './EdgeOverlay.module.css';
 
 interface EdgeOverlayProps {
@@ -558,7 +558,10 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
                         newData.edge = newData.edge.map(edgeStr => {
                             const match = edgeStr.match(/^([a-zA-Z0-9])([~<>-|]+)([a-zA-Z0-9])(?:\s+(.*))?$/);
                             if (match) {
-                                let [, startNode, type, endNode, text] = match;
+                                let startNode = match[1];
+                                const type = match[2];
+                                let endNode = match[3];
+                                const text = match[4];
                                 if (startNode === editingNodeChar) startNode = newChar;
                                 if (endNode === editingNodeChar) endNode = newChar;
                                 return text ? `${startNode}${type}${endNode} ${text}` : `${startNode}${type}${endNode}`;
