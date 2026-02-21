@@ -18,8 +18,9 @@ interface WaveRowProps {
     signalIndex: number;
     hoverStep: number | null;
     insertCursor?: number | null;
-    stepSelection?: { from: number; to: number } | null;
+    stepSelection?: { from: number; to: number; signalIndex?: number } | null;
     isSelectMode?: boolean;
+    hoverBoundary?: number | null;
 }
 
 const WaveRow: React.FC<WaveRowProps> = ({
@@ -29,6 +30,7 @@ const WaveRow: React.FC<WaveRowProps> = ({
     insertCursor = null,
     stepSelection = null,
     isSelectMode = false,
+    hoverBoundary = null,
 }) => {
     const { wave, data } = signal;
     const selectedTool = useWaveformStore((s) => s.selectedTool);
@@ -361,7 +363,7 @@ const WaveRow: React.FC<WaveRowProps> = ({
             })()}
 
             {/* 選択範囲オーバーレイ（列ハイライト） */}
-            {stepSelection && (
+            {stepSelection && (stepSelection.signalIndex === undefined || stepSelection.signalIndex === signalIndex) && (
                 <rect
                     x={stepSelection.from * CELL_WIDTH}
                     y={0}
@@ -381,6 +383,19 @@ const WaveRow: React.FC<WaveRowProps> = ({
                     x2={insertCursor * CELL_WIDTH}
                     y2={ROW_HEIGHT}
                     stroke="#00d8ff"
+                    strokeWidth={2}
+                    style={{ pointerEvents: 'none' }}
+                />
+            )}
+
+            {/* ホバー境界プレビュー */}
+            {hoverBoundary !== null && hoverBoundary !== insertCursor && (
+                <line
+                    x1={hoverBoundary * CELL_WIDTH}
+                    y1={0}
+                    x2={hoverBoundary * CELL_WIDTH}
+                    y2={ROW_HEIGHT}
+                    stroke="rgba(0, 216, 255, 0.4)"
                     strokeWidth={2}
                     style={{ pointerEvents: 'none' }}
                 />

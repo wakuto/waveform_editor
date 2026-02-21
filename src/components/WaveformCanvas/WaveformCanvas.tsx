@@ -159,33 +159,59 @@ const WaveformCanvas: React.FC = () => {
             e.preventDefault();
             const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
             const relX = e.clientX - rect.left;
-            isSelectDragging.current = true;
-            // クリック → 最近傍境界にカーソル移動（drag開始）
-            setInsertCursor(nearestBoundary(relX, maxLen));
-            selectDragStartCycle.current = Math.max(0, Math.min(Math.floor(relX / CELL_WIDTH), maxLen - 1));
+            const relY = e.clientY - rect.top;
+
+            // クリックした行（信号インデックス）を計算
+            const signalIndex = Math.max(0, Math.min(Math.floor(relY / ROW_HEIGHT), signals.length - 1));
+            setSelectedSignalIndex(signalIndex);
+
+            if (isNearBoundary(relX)) {
+                // 境界クリック → カーソル移動
+                setInsertCursor(nearestBoundary(relX, maxLen));
+                selectDragStartCycle.current = null;
+                isSelectDragging.current = false;
+            } else {
+                // サイクル内部クリック → 選択開始
+                isSelectDragging.current = true;
+                const cycle = Math.max(0, Math.min(Math.floor(relX / CELL_WIDTH), maxLen - 1));
+                selectDragStartCycle.current = cycle;
+                setStepSelection({ from: cycle, to: cycle, signalIndex });
+            }
         },
-        [maxLen, setInsertCursor]
+        [maxLen, setInsertCursor, signals.length, setSelectedSignalIndex, setStepSelection]
     );
 
     const handleWaveOverlayMouseMove = useCallback(
         (e: React.MouseEvent<HTMLDivElement>) => {
-            if (!isSelectDragging.current || selectDragStartCycle.current === null) return;
             const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
             const relX = e.clientX - rect.left;
+            const relY = e.clientY - rect.top;
+
+            // ホバー境界プレビュー（境界付近のみ）
+            setHoverBoundary(isNearBoundary(relX) ? nearestBoundary(relX, maxLen) : null);
+
+            if (!isSelectDragging.current || selectDragStartCycle.current === null) return;
+
             const cycle = Math.max(0, Math.min(Math.floor(relX / CELL_WIDTH), maxLen - 1));
-            if (cycle !== selectDragStartCycle.current) {
-                // ドラッグで範囲選択
-                const from = Math.min(selectDragStartCycle.current, cycle);
-                const to = Math.max(selectDragStartCycle.current, cycle);
-                setStepSelection({ from, to });
-            }
+            const signalIndex = Math.max(0, Math.min(Math.floor(relY / ROW_HEIGHT), signals.length - 1));
+
+            // ドラッグで範囲選択（単一信号選択）
+            const from = Math.min(selectDragStartCycle.current, cycle);
+            const to = Math.max(selectDragStartCycle.current, cycle);
+            setStepSelection({ from, to, signalIndex });
         },
-        [maxLen, setStepSelection]
+        [maxLen, signals.length, setStepSelection]
     );
 
     const handleWaveOverlayMouseUp = useCallback(() => {
         isSelectDragging.current = false;
         selectDragStartCycle.current = null;
+    }, []);
+
+    const handleWaveOverlayMouseLeave = useCallback(() => {
+        isSelectDragging.current = false;
+        selectDragStartCycle.current = null;
+        setHoverBoundary(null);
     }, []);
 
     const totalWaveWidth = maxLen * CELL_WIDTH;
@@ -292,6 +318,7 @@ const WaveformCanvas: React.FC = () => {
                                 insertCursor={insertCursor}
                                 stepSelection={stepSelection}
                                 isSelectMode={isSelectMode}
+                                hoverBoundary={hoverBoundary}
                             />
                         </div>
                     </div>
@@ -309,7 +336,7 @@ const WaveformCanvas: React.FC = () => {
                         onMouseDown={handleWaveOverlayMouseDown}
                         onMouseMove={handleWaveOverlayMouseMove}
                         onMouseUp={handleWaveOverlayMouseUp}
-                        onMouseLeave={handleWaveOverlayMouseUp}
+                        onMouseLeave={handleWaveOverlayMouseLeave}
                     />
                 )}
 
