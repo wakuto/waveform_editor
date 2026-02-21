@@ -1,0 +1,82 @@
+.toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 10px;
+    background: #0f3460;
+    border-bottom: 1px solid #1a1a4a;
+    user-select: none;
+}
+
+.group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.separator {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.15);
+    margin: 0 4px;
+}
+
+.btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #c8d0e0;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #fff;
+}
+
+.btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.btn.active {
+    background: #4a9df0;
+    border-color: #4a9df0;
+    color: #fff;
+}
+
+.toolBtn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #b0b8cc;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'Consolas', monospace;
+    font-weight: bold;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toolBtn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+}
+
+.toolBtn.active {
+    background: #4a9df0;
+    border-color: #6ab8ff;
+    color: #fff;
+    box-shadow: 0 0 6px rgba(74, 157, 240, 0.5);
+}

@@ -1,0 +1,130 @@
+.canvas {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    flex: 1;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.header {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #16213e;
+    border-bottom: 1px solid #2a2a4a;
+}
+
+.labelPlaceholder {
+    width: 120px;
+    min-width: 120px;
+    flex-shrink: 0;
+    border-right: 1px solid #2a2a4a;
+}
+
+.stepsHeader {
+    display: flex;
+    overflow: hidden;
+}
+
+.stepNumber {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #666;
+    height: 20px;
+    border-right: 1px solid #1e1e3a;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.rows {
+    display: flex;
+    flex-direction: column;
+}
+
+.row {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid #1e1e3a;
+    cursor: default;
+    transition: background 0.1s;
+    box-sizing: border-box;
+}
+
+.row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.selected {
+    background: rgba(74, 157, 240, 0.08) !important;
+}
+
+.dragOver {
+    border-top: 2px solid #4a9df0;
+}
+
+.label {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    background: #16213e;
+    border-right: 1px solid #2a2a4a;
+    flex-shrink: 0;
+    user-select: none;
+    cursor: grab;
+    box-sizing: border-box;
+}
+
+.label:active {
+    cursor: grabbing;
+}
+
+.labelText {
+    font-size: 12px;
+    color: #c0c0d0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+}
+
+.labelInput {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #4a9df0;
+    color: #e0e0e0;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+}
+
+.waveArea {
+    overflow: visible;
+    display: flex;
+    align-items: center;
+}
+
+.addRow {
+    padding: 8px 12px;
+}
+
+.addButton {
+    background: transparent;
+    border: 1px dashed #444;
+    color: #888;
+    padding: 4px 16px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+
+.addButton:hover {
+    border-color: #4a9df0;
+    color: #4a9df0;
+}

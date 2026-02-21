@@ -1,0 +1,9 @@
+.waveRow {
+    display: block;
+    overflow: visible;
+}
+
+.hovered path,
+.hovered line {
+    filter: brightness(1.3);
+}
