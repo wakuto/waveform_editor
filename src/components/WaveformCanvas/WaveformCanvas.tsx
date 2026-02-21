@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useWaveformStore } from '../../store/useWaveformStore';
 import type { WaveTool } from '../../types/wavedrom';
-import { getSignalList, CELL_WIDTH, ROW_HEIGHT, LABEL_WIDTH } from '../../utils/waveformUtils';
+import { getSignalList, BASE_CELL_WIDTH, ROW_HEIGHT, LABEL_WIDTH } from '../../utils/waveformUtils';
 import WaveRow from './WaveRow';
 import styles from './WaveformCanvas.module.css';
 
@@ -25,18 +25,20 @@ const TOOLS: { key: WaveTool; label: string; title: string }[] = [
 const BOUNDARY_SNAP_PX = 8;
 
 /** マウスX座標から最も近い境界インデックスを返す */
-function nearestBoundary(relX: number, maxLen: number): number {
-    return Math.max(0, Math.min(Math.round(relX / CELL_WIDTH), maxLen));
+function nearestBoundary(relX: number, maxLen: number, cellWidth: number): number {
+    return Math.max(0, Math.min(Math.round(relX / cellWidth), maxLen));
 }
 
 /** マウスX座標がサイクル境界のスナップ圏内かを判定 */
-function isNearBoundary(relX: number): boolean {
-    const offset = relX % CELL_WIDTH;
-    return offset <= BOUNDARY_SNAP_PX || offset >= CELL_WIDTH - BOUNDARY_SNAP_PX;
+function isNearBoundary(relX: number, cellWidth: number): boolean {
+    const offset = relX % cellWidth;
+    return offset <= BOUNDARY_SNAP_PX || offset >= cellWidth - BOUNDARY_SNAP_PX;
 }
 
 const WaveformCanvas: React.FC = () => {
     const waveformData = useWaveformStore((s) => s.waveformData);
+    const zoom = useWaveformStore((s) => s.zoom);
+    const CELL_WIDTH = BASE_CELL_WIDTH * zoom;
     const hoverInfo = useWaveformStore((s) => s.hoverInfo);
     const selectedTool = useWaveformStore((s) => s.selectedTool);
     const setSelectedTool = useWaveformStore((s) => s.setSelectedTool);
@@ -172,7 +174,7 @@ const WaveformCanvas: React.FC = () => {
     );
 
     const [toolMenu, setToolMenu] = useState<{ x: number; y: number } | null>(null);
-    const [hoveredTool, setHoveredTool] = useState<string | null>(null);
+    const [hoveredTool, setHoveredTool] = useState<import('../../types/wavedrom').WaveTool | null>(null);
     const isToolMenuOpenRef = useRef(false);
     const wasToolMenuOpenRef = useRef(false);
 
@@ -313,9 +315,9 @@ const WaveformCanvas: React.FC = () => {
         (e: React.MouseEvent<HTMLDivElement>) => {
             if (e.button !== 0) return;
             const relX = getHeaderRelX(e);
-            if (isNearBoundary(relX)) {
+            if (isNearBoundary(relX, CELL_WIDTH)) {
                 // 境界クリック → カーソル移動
-                setInsertCursor(nearestBoundary(relX, maxLen));
+                setInsertCursor(nearestBoundary(relX, maxLen, CELL_WIDTH));
                 headerDragStartCycle.current = null;
             } else {
                 // サイクル内部クリック → 選択開始
@@ -324,14 +326,14 @@ const WaveformCanvas: React.FC = () => {
                 setStepSelection({ from: cycle, to: cycle });
             }
         },
-        [getHeaderRelX, maxLen, setInsertCursor, setStepSelection]
+        [getHeaderRelX, maxLen, setInsertCursor, setStepSelection, CELL_WIDTH]
     );
 
     const handleHeaderMouseMove = useCallback(
         (e: React.MouseEvent<HTMLDivElement>) => {
             const relX = getHeaderRelX(e);
             // ホバー境界プレビュー（境界付近のみ）
-            setHoverBoundary(isNearBoundary(relX) ? nearestBoundary(relX, maxLen) : null);
+            setHoverBoundary(isNearBoundary(relX, CELL_WIDTH) ? nearestBoundary(relX, maxLen, CELL_WIDTH) : null);
 
             // ドラッグ中なら選択範囲を更新
             if (headerDragStartCycle.current !== null) {
@@ -341,7 +343,7 @@ const WaveformCanvas: React.FC = () => {
                 setStepSelection({ from, to });
             }
         },
-        [getHeaderRelX, maxLen, setStepSelection]
+        [getHeaderRelX, maxLen, setStepSelection, CELL_WIDTH]
     );
 
     const handleHeaderMouseUp = useCallback(() => {
@@ -410,9 +412,9 @@ const WaveformCanvas: React.FC = () => {
             const signalIndex = getSignalIndexFromY(relY);
             setSelectedSignalIndex(signalIndex);
 
-            if (isNearBoundary(relX)) {
+            if (isNearBoundary(relX, CELL_WIDTH)) {
                 // 境界クリック → カーソル移動
-                setInsertCursor(nearestBoundary(relX, maxLen));
+                setInsertCursor(nearestBoundary(relX, maxLen, CELL_WIDTH));
                 selectDragStartCycle.current = null;
                 isSelectDragging.current = false;
             } else {
@@ -423,7 +425,7 @@ const WaveformCanvas: React.FC = () => {
                 setStepSelection({ from: cycle, to: cycle, signalIndex });
             }
         },
-        [maxLen, setInsertCursor, setSelectedSignalIndex, setStepSelection, getSignalIndexFromY]
+        [maxLen, setInsertCursor, setSelectedSignalIndex, setStepSelection, getSignalIndexFromY, CELL_WIDTH]
     );
 
     const handleWaveOverlayMouseMove = useCallback(
@@ -433,7 +435,7 @@ const WaveformCanvas: React.FC = () => {
             const relY = e.clientY - rect.top;
 
             // ホバー境界プレビュー（境界付近のみ）
-            setHoverBoundary(isNearBoundary(relX) ? nearestBoundary(relX, maxLen) : null);
+            setHoverBoundary(isNearBoundary(relX, CELL_WIDTH) ? nearestBoundary(relX, maxLen, CELL_WIDTH) : null);
 
             if (!isSelectDragging.current || selectDragStartCycle.current === null) return;
 
@@ -445,7 +447,7 @@ const WaveformCanvas: React.FC = () => {
             const to = Math.max(selectDragStartCycle.current, cycle);
             setStepSelection({ from, to, signalIndex });
         },
-        [maxLen, setStepSelection, getSignalIndexFromY]
+        [maxLen, setStepSelection, getSignalIndexFromY, CELL_WIDTH]
     );
 
     const handleWaveOverlayMouseUp = useCallback(() => {
@@ -470,13 +472,65 @@ const WaveformCanvas: React.FC = () => {
 
             useWaveformStore.getState().openDataLabelEdit(signalIndex, stepIndex);
         },
-        [maxLen, getSignalIndexFromY]
+        [maxLen, getSignalIndexFromY, CELL_WIDTH]
     );
+
+    const canvasRef = useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                // ズーム処理
+                const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+                const currentZoom = useWaveformStore.getState().zoom;
+                const newZoom = Math.max(0.1, Math.min(currentZoom + zoomDelta, 5));
+
+                if (newZoom !== currentZoom) {
+                    // マウス位置を中心にズームするためのスクロール位置調整
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const scrollX = canvas.scrollLeft;
+
+                    // ラベル領域の幅を考慮
+                    const labelWidth = LABEL_WIDTH;
+                    if (mouseX > labelWidth) {
+                        const waveMouseX = mouseX - labelWidth + scrollX;
+                        const zoomRatio = newZoom / currentZoom;
+                        const newWaveMouseX = waveMouseX * zoomRatio;
+
+                        useWaveformStore.getState().setZoom(newZoom);
+
+                        // ズーム適用後にスクロール位置を更新
+                        setTimeout(() => {
+                            if (canvasRef.current) {
+                                canvasRef.current.scrollLeft = newWaveMouseX - (mouseX - labelWidth);
+                            }
+                        }, 0);
+                    } else {
+                        useWaveformStore.getState().setZoom(newZoom);
+                    }
+                }
+            } else if (e.shiftKey) {
+                // 横スクロール処理
+                e.preventDefault();
+                canvas.scrollLeft += e.deltaX !== 0 ? e.deltaX : e.deltaY;
+            }
+        };
+
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        return () => {
+            canvas.removeEventListener('wheel', handleWheel);
+        };
+    }, []);
 
     const totalWaveWidth = maxLen * CELL_WIDTH;
 
     return (
-        <div className={styles.canvas}>
+        <div className={styles.canvas} ref={canvasRef}>
             {/* タイムステップヘッダー */}
             <div className={styles.header}>
                 <div className={styles.labelPlaceholder} />
@@ -747,6 +801,50 @@ const WaveformCanvas: React.FC = () => {
                     }}
                     onContextMenu={(e) => e.preventDefault()}
                 >
+                    <div
+                        className={styles.contextMenuItem}
+                        onClick={() => {
+                            useWaveformStore.getState().insertSignal(contextMenu.path);
+                            setContextMenu(null);
+                        }}
+                    >
+                        信号を追加 (Add Signal)
+                    </div>
+                    <div
+                        className={styles.contextMenuItem}
+                        onClick={() => {
+                            useWaveformStore.getState().insertGroup(contextMenu.path, 'New Group');
+                            const newPath = [...contextMenu.path];
+                            newPath[newPath.length - 1]++;
+
+                            setTimeout(() => {
+                                const signals = useWaveformStore.getState().waveformData.signal;
+                                let groupIndex = 0;
+                                let targetGroupIndex = -1;
+                                const traverse = (items: import('../../types/wavedrom').WaveSignalOrGroup[], basePath: number[]) => {
+                                    items.forEach((item, i) => {
+                                        const currentPath = basePath.length === 0 ? [i] : [...basePath, i + 1];
+                                        if (Array.isArray(item)) {
+                                            if (currentPath.join(',') === newPath.join(',')) {
+                                                targetGroupIndex = groupIndex;
+                                            }
+                                            groupIndex++;
+                                            traverse(item.slice(1) as import('../../types/wavedrom').WaveSignalOrGroup[], currentPath);
+                                        }
+                                    });
+                                };
+                                traverse(signals, []);
+                                if (targetGroupIndex !== -1) {
+                                    setEditingGroupIndex(targetGroupIndex);
+                                    setEditingGroupName('New Group');
+                                }
+                            }, 0);
+                            setContextMenu(null);
+                        }}
+                    >
+                        グループを追加 (Add Group)
+                    </div>
+                    <div style={{ height: '1px', background: '#4a9df0', margin: '4px 0', opacity: 0.3 }} />
                     <div
                         className={styles.contextMenuItem}
                         onClick={() => {

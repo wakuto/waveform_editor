@@ -22,7 +22,7 @@ export function getSignalList(signals: WaveSignalOrGroup[]): WaveSignal[] {
 }
 
 // ─── 描画定数 ────────────────────────────────────────────────────────
-export const CELL_WIDTH = 40;   // 1タイムステップの幅 (px)
+export const BASE_CELL_WIDTH = 40;   // 1タイムステップの基準幅 (px)
 export const ROW_HEIGHT = 40;   // 1信号行の高さ (px)
 export const LABEL_WIDTH = 120; // 信号ラベル領域の幅 (px)
 export const WAVE_PADDING = 6;  // 上下の余白 (px)

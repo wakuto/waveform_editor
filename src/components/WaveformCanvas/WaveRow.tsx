@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    CELL_WIDTH,
+    BASE_CELL_WIDTH,
     ROW_HEIGHT,
     WAVE_TOP,
     WAVE_BOT,
@@ -41,6 +41,8 @@ const WaveRow: React.FC<WaveRowProps> = ({
     const setDataLabel = useWaveformStore((s) => s.setDataLabel);
     const editingDataCell = useWaveformStore((s) => s.editingDataCell);
     const setEditingDataCell = useWaveformStore((s) => s.setEditingDataCell);
+    const zoom = useWaveformStore((s) => s.zoom);
+    const CELL_WIDTH = BASE_CELL_WIDTH * zoom;
 
     const dataIndexMap = buildDataIndexMap(wave);
     const isDragging = useRef(false);
@@ -68,7 +70,7 @@ const WaveRow: React.FC<WaveRowProps> = ({
         const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
         const relX = e.clientX - rect.left;
         return Math.floor(relX / CELL_WIDTH);
-    }, []);
+    }, [CELL_WIDTH]);
 
     const handleMouseDown = useCallback(
         (e: React.MouseEvent<SVGRectElement>, stepIndex: number) => {
@@ -152,7 +154,7 @@ const WaveRow: React.FC<WaveRowProps> = ({
     );
 
     const handleContextMenu = useCallback(
-        (e: React.MouseEvent<SVGRectElement>, _stepIndex: number) => {
+        (_e: React.MouseEvent<SVGRectElement>, _stepIndex: number) => {
             // 右クリックメニューは WaveformCanvas 側で処理するため、ここでは何もしない
         },
         []

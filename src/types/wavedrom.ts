@@ -78,6 +78,7 @@ export interface AppState {
     hoverInfo: { signalIndex: number; stepIndex: number } | null;
     editingDataCell: { signalIndex: number; stepIndex: number } | null;
     statusMessage: string;
+    zoom: number;
     /** 挿入カーソル位置（サイクル境界インデックス: 0〜N） */
     insertCursor: number | null;
     /** 選択中のサイクル範囲（from/to はステップインデックス 0〜N-1、signalIndex がある場合は単一信号選択） */

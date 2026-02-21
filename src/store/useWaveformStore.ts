@@ -25,6 +25,8 @@ interface WaveformStore extends AppState {
     duplicateItem: (path: number[]) => void;
     copyItem: (path: number[]) => void;
     pasteItem: (path: number[]) => void;
+    insertSignal: (path: number[]) => void;
+    insertGroup: (path: number[], name: string) => void;
 
     // グループ管理
     addGroup: (name: string) => void;
@@ -56,6 +58,7 @@ interface WaveformStore extends AppState {
     setHoverInfo: (info: { signalIndex: number; stepIndex: number } | null) => void;
     setEditingDataCell: (cell: { signalIndex: number; stepIndex: number } | null) => void;
     openDataLabelEdit: (signalIndex: number, stepIndex: number) => void;
+    setZoom: (zoom: number) => void;
 
     // Undo/Redo
     undo: () => void;
@@ -420,6 +423,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     hoverInfo: null,
     editingDataCell: null,
     statusMessage: '',
+    zoom: 1,
     insertCursor: null,
     stepSelection: null,
     stepClipboard: null,
@@ -767,6 +771,59 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             return { waveformData: newData, ...pushHistory(state, prev) };
         }),
 
+    insertSignal: (path) =>
+        set((state) => {
+            const prev = state.waveformData;
+            const newSignals = JSON.parse(JSON.stringify(prev.signal)) as WaveSignalOrGroup[];
+
+            const getArrayAndIndex = (signals: WaveSignalOrGroup[], path: number[]) => {
+                let currentArray: WaveSignalOrGroup[] = signals;
+                for (let i = 0; i < path.length - 1; i++) {
+                    const next = currentArray[path[i]];
+                    if (!Array.isArray(next)) return null;
+                    currentArray = next as unknown as WaveSignalOrGroup[];
+                }
+                return { array: currentArray, index: path[path.length - 1] };
+            };
+
+            const info = getArrayAndIndex(newSignals, path);
+            if (!info) return {};
+
+            const maxLen = getSignalList(prev.signal).reduce((m, s) => Math.max(m, s.wave.length), 8);
+            const newSig = { name: 'new_signal', wave: '.'.repeat(maxLen) };
+
+            info.array.splice(info.index + 1, 0, newSig);
+
+            const newData = { ...prev, signal: newSignals };
+            return { waveformData: newData, ...pushHistory(state, prev) };
+        }),
+
+    insertGroup: (path, name) =>
+        set((state) => {
+            const prev = state.waveformData;
+            const newSignals = JSON.parse(JSON.stringify(prev.signal)) as WaveSignalOrGroup[];
+
+            const getArrayAndIndex = (signals: WaveSignalOrGroup[], path: number[]) => {
+                let currentArray: WaveSignalOrGroup[] = signals;
+                for (let i = 0; i < path.length - 1; i++) {
+                    const next = currentArray[path[i]];
+                    if (!Array.isArray(next)) return null;
+                    currentArray = next as unknown as WaveSignalOrGroup[];
+                }
+                return { array: currentArray, index: path[path.length - 1] };
+            };
+
+            const info = getArrayAndIndex(newSignals, path);
+            if (!info) return {};
+
+            const newGroup: WaveGroup = [name];
+
+            info.array.splice(info.index + 1, 0, newGroup);
+
+            const newData = { ...prev, signal: newSignals };
+            return { waveformData: newData, ...pushHistory(state, prev) };
+        }),
+
     addTimeStep: () =>
         set((state) => {
             const prev = state.waveformData;
@@ -814,6 +871,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
 
         set({ editingDataCell: { signalIndex, stepIndex: src } });
     },
+    setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(zoom, 5)) }),
 
     // ─── 挿入カーソル・選択ツール ─────────────────────────────────────
     // カーソルを設定したら選択範囲をクリア（排他）

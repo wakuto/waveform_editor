@@ -22,6 +22,10 @@
     min-width: 120px;
     flex-shrink: 0;
     border-right: 1px solid #2a2a4a;
+    position: sticky;
+    left: 0;
+    z-index: 11;
+    background: #16213e;
 }
 
 .stepsHeader {
@@ -81,7 +85,9 @@
     user-select: none;
     cursor: grab;
     box-sizing: border-box;
-    position: relative;
+    position: sticky;
+    left: 0;
+    z-index: 5;
 }
 
 .labelInGroup {
@@ -137,7 +143,11 @@
     font-weight: bold;
     user-select: none;
     cursor: pointer;
-    position: relative;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    width: fit-content;
+    min-width: 100%;
 }
 
 .groupHeader:hover {
@@ -188,6 +198,9 @@
 
 .addRow {
     padding: 8px 12px;
+    position: sticky;
+    left: 0;
+    width: max-content;
 }
 
 .addButton {
