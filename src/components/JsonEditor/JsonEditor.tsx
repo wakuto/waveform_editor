@@ -9,17 +9,21 @@ const JsonEditor: React.FC = () => {
 
     const [text, setText] = useState(() => formatWaveDromJSON(waveformData));
     const [error, setError] = useState<string | null>(null);
+    const [isEditing, setIsEditing] = useState(false);
 
     // 波形データが外部から変更されたときにテキストを更新
     useEffect(() => {
-        setText(formatWaveDromJSON(waveformData));
-        setError(null);
-    }, [waveformData]);
+        if (!isEditing) {
+            setText(formatWaveDromJSON(waveformData));
+            setError(null);
+        }
+    }, [waveformData, isEditing]);
 
     const handleChange = useCallback(
         (e: React.ChangeEvent<HTMLTextAreaElement>) => {
             const val = e.target.value;
             setText(val);
+            setIsEditing(true);
             try {
                 const parsed = JSON.parse(val);
                 if (!Array.isArray(parsed.signal)) throw new Error('"signal" 配列が必要です');
@@ -32,6 +36,11 @@ const JsonEditor: React.FC = () => {
         [setWaveformData]
     );
 
+    const handleBlur = useCallback(() => {
+        setIsEditing(false);
+        setText(formatWaveDromJSON(waveformData));
+    }, [waveformData]);
+
     return (
         <div className={styles.panel}>
             <div className={styles.header}>
@@ -42,6 +51,7 @@ const JsonEditor: React.FC = () => {
                 className={`${styles.editor} ${error ? styles.hasError : ''}`}
                 value={text}
                 onChange={handleChange}
+                onBlur={handleBlur}
                 spellCheck={false}
                 wrap="off"
             />
