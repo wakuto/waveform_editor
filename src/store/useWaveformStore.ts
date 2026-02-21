@@ -467,12 +467,52 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const prev = state.waveformData;
             const from = Math.min(dragStartStep, currentStep);
             const to = Math.max(dragStartStep, currentStep);
-            // 左端のセルだけ value、それ以降は継続 '.' を設定
+
             const newData = updateFlatSignal(prev, signalIndex, (sig) => {
                 const waveArr = sig.wave.split('');
                 while (waveArr.length <= to) waveArr.push('.');
-                waveArr[from] = value;
+
+                // 上書きされる前の to の位置の状態を解決
+                let oldCharAtTo = '.';
+                for (let i = to; i >= 0; i--) {
+                    if (waveArr[i] !== '.' && waveArr[i] !== '|') {
+                        oldCharAtTo = waveArr[i];
+                        break;
+                    }
+                }
+
+                // from の直前の状態を解決
+                let prevChar = '.';
+                for (let i = from - 1; i >= 0; i--) {
+                    if (waveArr[i] !== '.' && waveArr[i] !== '|') {
+                        prevChar = waveArr[i];
+                        break;
+                    }
+                }
+
+                let startChar = value;
+                if (prevChar === value) {
+                    startChar = '.';
+                }
+
+                waveArr[from] = startChar;
                 for (let i = from + 1; i <= to; i++) waveArr[i] = '.';
+
+                // to + 1 の処理
+                if (to + 1 < waveArr.length) {
+                    if (waveArr[to + 1] === '.') {
+                        // 元々 to + 1 が '.' だった場合、それは oldCharAtTo の継続だった。
+                        // 上書きによって継続する値が value に変わってしまうため、
+                        // oldCharAtTo と value が異なる場合は、to + 1 に oldCharAtTo を書き込む。
+                        if (oldCharAtTo !== value) {
+                            waveArr[to + 1] = oldCharAtTo;
+                        }
+                    } else if (waveArr[to + 1] === value) {
+                        // to + 1 が value と同じ場合、継続になるので '.' にする
+                        waveArr[to + 1] = '.';
+                    }
+                }
+
                 return { ...sig, wave: waveArr.join('') };
             });
             return { waveformData: newData, ...(pushHist ? pushHistory(state, prev) : {}) };
