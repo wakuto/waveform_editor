@@ -3,6 +3,7 @@ import { useWaveformStore } from '../../store/useWaveformStore';
 import type { WaveTool } from '../../types/wavedrom';
 import { DEFAULT_WAVEFORM } from '../../types/wavedrom';
 import { getSignalList } from '../../utils/waveformUtils';
+import { downloadSVG, downloadPNG } from '../../utils/exportUtils';
 import styles from './Toolbar.module.css';
 
 const TOOLS: { key: WaveTool; label: string; title: string }[] = [
@@ -75,23 +76,15 @@ const Toolbar: React.FC = () => {
         URL.revokeObjectURL(url);
     }, [waveformData]);
 
-    /** SVGエクスポート */
+    /** SVGエクスポート（wavedrom使用） */
     const handleExportSVG = useCallback(() => {
-        const svgEl = document.querySelector('.waveform-export-svg') as SVGSVGElement | null;
-        if (!svgEl) {
-            alert('SVG要素が見つかりません。');
-            return;
-        }
-        const serializer = new XMLSerializer();
-        const svgStr = serializer.serializeToString(svgEl);
-        const blob = new Blob([svgStr], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'waveform.svg';
-        a.click();
-        URL.revokeObjectURL(url);
-    }, []);
+        downloadSVG(waveformData);
+    }, [waveformData]);
+
+    /** PNGエクスポート（wavedrom使用） */
+    const handleExportPNG = useCallback(() => {
+        downloadPNG(waveformData);
+    }, [waveformData]);
 
     return (
         <div className={styles.toolbar}>
@@ -101,6 +94,7 @@ const Toolbar: React.FC = () => {
                 <button className={styles.btn} onClick={handleOpen} title="開く (Ctrl+O)">開く</button>
                 <button className={styles.btn} onClick={handleSave} title="保存 (Ctrl+S)">保存</button>
                 <button className={styles.btn} onClick={handleExportSVG} title="SVGエクスポート">SVG</button>
+                <button className={styles.btn} onClick={handleExportPNG} title="PNGエクスポート">PNG</button>
             </div>
 
             <div className={styles.separator} />
