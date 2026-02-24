@@ -124,7 +124,7 @@ const Toolbar: React.FC = () => {
                     onClick={() => setSelectedTool('select')}
                     title="選択ツール (S)"
                 >
-                    ▷ 選択
+                    ↖ 選択
                 </button>
                 <button
                     className={`${styles.btn} ${selectedTool === 'edge' ? styles.active : ''}`}
@@ -141,7 +141,7 @@ const Toolbar: React.FC = () => {
                             disabled={insertCursor === null}
                             title="カーソル位置にステップを挿入 (Insert)"
                         >
-                            ⊕
+                            ➕
                         </button>
                         <button
                             className={styles.toolBtn}
@@ -149,7 +149,7 @@ const Toolbar: React.FC = () => {
                             disabled={!stepSelection}
                             title="選択範囲を削除 (Delete)"
                         >
-                            ⊖
+                            🗑️
                         </button>
                         <button
                             className={styles.toolBtn}
@@ -157,7 +157,7 @@ const Toolbar: React.FC = () => {
                             disabled={!stepSelection}
                             title="コピー (Ctrl+C)"
                         >
-                            ⎘
+                            📄
                         </button>
                         <button
                             className={styles.toolBtn}
@@ -165,7 +165,7 @@ const Toolbar: React.FC = () => {
                             disabled={!stepSelection}
                             title="カット (Ctrl+X)"
                         >
-                            ✂
+                            ✂️
                         </button>
                         <button
                             className={styles.toolBtn}
@@ -173,7 +173,7 @@ const Toolbar: React.FC = () => {
                             disabled={!stepClipboard || insertCursor === null}
                             title="ペースト (Ctrl+V)"
                         >
-                            ⎗
+                            📋
                         </button>
                     </>
                 )}

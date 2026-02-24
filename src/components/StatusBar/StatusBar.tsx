@@ -21,7 +21,7 @@ const TOOL_NAMES: Record<string, string> = {
     '9': 'Data Lime (9)',
     '.': 'Continue (.)',
     '|': 'Gap (|)',
-    'select': '▷ 選択',
+    'select': '↖ 選択',
     'edge': '↗ エッジ',
 };
 
