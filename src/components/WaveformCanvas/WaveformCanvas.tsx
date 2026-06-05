@@ -224,6 +224,21 @@ const WaveformCanvas: React.FC = () => {
     const isToolMenuOpenRef = useRef(false);
     const wasToolMenuOpenRef = useRef(false);
 
+    useLayoutEffect(() => {
+        if (!contextMenu || !contextMenuRef.current) return;
+        const menuRect = contextMenuRef.current.getBoundingClientRect();
+        const maxX = Math.max(MENU_VIEWPORT_MARGIN, window.innerWidth - menuRect.width - MENU_VIEWPORT_MARGIN);
+        const maxY = Math.max(MENU_VIEWPORT_MARGIN, window.innerHeight - menuRect.height - MENU_VIEWPORT_MARGIN);
+        const clampedX = Math.min(Math.max(contextMenu.x, MENU_VIEWPORT_MARGIN), maxX);
+        const clampedY = Math.min(Math.max(contextMenu.y, MENU_VIEWPORT_MARGIN), maxY);
+        if (clampedX !== contextMenu.x || clampedY !== contextMenu.y) {
+            setContextMenu((prev) => {
+                if (!prev) return prev;
+                return { ...prev, x: clampedX, y: clampedY };
+            });
+        }
+    }, [contextMenu]);
+
     // ツールメニューに表示するツールを絞り込む
     const RADIAL_TOOLS = React.useMemo(() => {
         const allowedKeys = ['0', '1', '=', 'x', '.', 'select', 'edge'];
@@ -1096,17 +1111,3 @@ const WaveformCanvas: React.FC = () => {
 };
 
 export default WaveformCanvas;
-    useLayoutEffect(() => {
-        if (!contextMenu || !contextMenuRef.current) return;
-        const menuRect = contextMenuRef.current.getBoundingClientRect();
-        const maxX = Math.max(MENU_VIEWPORT_MARGIN, window.innerWidth - menuRect.width - MENU_VIEWPORT_MARGIN);
-        const maxY = Math.max(MENU_VIEWPORT_MARGIN, window.innerHeight - menuRect.height - MENU_VIEWPORT_MARGIN);
-        const clampedX = Math.min(Math.max(contextMenu.x, MENU_VIEWPORT_MARGIN), maxX);
-        const clampedY = Math.min(Math.max(contextMenu.y, MENU_VIEWPORT_MARGIN), maxY);
-        if (clampedX !== contextMenu.x || clampedY !== contextMenu.y) {
-            setContextMenu((prev) => {
-                if (!prev) return prev;
-                return { ...prev, x: clampedX, y: clampedY };
-            });
-        }
-    }, [contextMenu]);
