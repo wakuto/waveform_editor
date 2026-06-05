@@ -982,13 +982,11 @@ const WaveformCanvas: React.FC = () => {
                         className={styles.contextMenuItem}
                         style={{ color: '#ff6b6b' }}
                         onClick={() => {
-                            if (window.confirm(`${contextMenu.type === 'group' ? 'グループ' : '信号'} "${contextMenu.name}" を削除しますか？`)) {
-                                if (contextMenu.type === 'group' && contextMenu.groupIndex !== undefined) {
-                                    const removeGroup = useWaveformStore.getState().removeGroup;
-                                    if (removeGroup) removeGroup(contextMenu.groupIndex);
-                                } else if (contextMenu.type === 'signal' && contextMenu.flatIndex !== undefined) {
-                                    removeSignal(contextMenu.flatIndex);
-                                }
+                            if (contextMenu.type === 'group' && contextMenu.groupIndex !== undefined) {
+                                const removeGroup = useWaveformStore.getState().removeGroup;
+                                if (removeGroup) removeGroup(contextMenu.groupIndex);
+                            } else if (contextMenu.type === 'signal' && contextMenu.flatIndex !== undefined) {
+                                removeSignal(contextMenu.flatIndex);
                             }
                             setContextMenu(null);
                         }}

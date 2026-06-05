@@ -50,28 +50,20 @@ const WaveRow: React.FC<WaveRowProps> = ({
     // ドラッグ中UIフィードバック用 state
     const [isDraggingState, setIsDraggingState] = useState(false);
     const [dragCurrentStep, setDragCurrentStep] = useState<number | null>(null);
-    // ラベルインライン編集用 state
-    const [editingLabel, setEditingLabel] = useState('');
+    // ラベルインライン編集用 state (グローバルストアから取得)
+    const editingLabel = useWaveformStore((s) => s.editingDataLabelValue);
+    const setEditingLabel = useWaveformStore((s) => s.setEditingDataLabelValue);
     const editInputRef = useRef<HTMLInputElement>(null);
 
     const isEditingThisRow = editingDataCell?.signalIndex === signalIndex;
     const editingDataStep = isEditingThisRow ? editingDataCell.stepIndex : null;
 
-    // 外部から編集状態になったときにラベルを初期化
+    // 外部から編集状態になったときにフォーカスを当てる
     useEffect(() => {
         if (isEditingThisRow && editingDataStep !== null) {
-            let dataIdx = 0;
-            for (let i = 0; i <= editingDataStep; i++) {
-                const ch = wave[i];
-                if (ch === '=' || (ch >= '2' && ch <= '9')) {
-                    if (i === editingDataStep) break;
-                    dataIdx++;
-                }
-            }
-            setEditingLabel(data?.[dataIdx] ?? '');
             setTimeout(() => editInputRef.current?.select(), 0);
         }
-    }, [isEditingThisRow, editingDataStep, data, wave]);
+    }, [isEditingThisRow, editingDataStep]);
 
     const getCellIndex = useCallback((e: React.MouseEvent<SVGElement>) => {
         const rect = (e.currentTarget as SVGElement).getBoundingClientRect();

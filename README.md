@@ -1,73 +1,59 @@
-# React + TypeScript + Vite
+# Waveform Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+デジタル回路のタイミング設計で使用する波形（タイミングダイアグラム）を、GUIで直感的に編集できるWebアプリケーションです。
 
-Currently, two official plugins are available:
+## 特徴
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **直感的なGUI編集**: ブラウザ上で直接波形をクリック・ドラッグして編集可能
+- **WaveDrom互換**: 内部データ形式としてWaveDrom JSONを採用。既存のWaveDrom資産をそのまま活用でき、Gitでのバージョン管理にも最適
+- **フロントエンド完結**: サーバー不要で動作し、静的ファイルとしてデプロイ可能。ローカルでも動作します
+- **リアルタイムプレビュー**: 編集内容が即座に波形に反映され、WaveDromのプレビューも同時に確認可能
+- **充実した編集ツール**:
+  - `0`(Low), `1`(High), `p/n`(Clock), `z`(Hi-Z), `x`(Undefined), `.`(Continue), `=`(Data) などの波形状態をサポート
+  - サイクル単位でのコピー＆ペースト、挿入、削除機能
+  - エッジ（矢印）の直感的な追加・編集
+  - Undo / Redo 対応
 
-## React Compiler
+## 使用技術
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React + TypeScript
+- Vite
+- Zustand (状態管理)
+- CSS Modules
+- カスタムSVGレンダリング (WaveDromライブラリはプレビュー用に使用し、メインの編集画面は高速な独自レンダリング)
 
-## Expanding the ESLint configuration
+## インストールと実行
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+依存関係をインストールしてローカル開発サーバーを起動します：
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+ビルドを行う場合：
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
 ```
+
+## 使い方
+
+1. 左側のツールバーからツール（ペン、選択など）を選択します。
+2. 波形キャンバス上をクリックまたはドラッグして波形を描画します。
+3. 信号名の変更や、信号の追加・削除・並べ替えは左側のラベルエリアで行います。
+4. 右側のJSONエディタを開いて、直接WaveDrom JSONを編集することも可能です（双方向同期）。
+5. 「保存」ボタンでJSONファイルとして保存、またはSVG/PNGとしてエクスポートできます。
+
+### キーボードショートカット
+
+- `Ctrl + Z`: Undo (元に戻す)
+- `Ctrl + Shift + Z`: Redo (やり直し)
+- `Ctrl + S`: JSONとして保存
+- `Ctrl + ホイール`: ズームイン/アウト
+- `Shift + ホイール`: 横スクロール
+- 各種ツール切り替え: `S`(選択), `0`, `1`, `P`, `N`, `X`, `Z`, `D`(Data) など
+
+## 詳細な仕様
+
+詳細なアーキテクチャや機能仕様については、[SPECIFICATION.md](./SPECIFICATION.md) を参照してください。

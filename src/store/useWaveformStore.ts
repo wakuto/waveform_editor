@@ -59,6 +59,7 @@ interface WaveformStore extends AppState {
     setConfigPanelVisible: (visible: boolean) => void;
     setHoverInfo: (info: { signalIndex: number; stepIndex: number } | null) => void;
     setEditingDataCell: (cell: { signalIndex: number; stepIndex: number } | null) => void;
+    setEditingDataLabelValue: (value: string) => void;
     openDataLabelEdit: (signalIndex: number, stepIndex: number) => void;
     setZoom: (zoom: number) => void;
 
@@ -436,6 +437,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     configPanelVisible: false,
     hoverInfo: null,
     editingDataCell: null,
+    editingDataLabelValue: '',
     statusMessage: '',
     zoom: 1,
     insertCursor: null,
@@ -594,12 +596,36 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     removeSignal: (index) =>
         set((state) => {
             const prev = state.waveformData;
-            const flatSignals = getSignalList(prev.signal);
-            if (index < 0 || index >= flatSignals.length) return {};
-            const target = flatSignals[index];
+            let currentSignalIndex = 0;
+            let removed = false;
+
+            const filterSignals = (items: WaveSignalOrGroup[]): WaveSignalOrGroup[] => {
+                const result: WaveSignalOrGroup[] = [];
+                for (const item of items) {
+                    if (Array.isArray(item)) {
+                        const [groupName, ...children] = item;
+                        result.push([groupName, ...filterSignals(children)] as WaveGroup);
+                    } else if (item && typeof (item as WaveSignal).wave === 'string') {
+                        const isTarget = currentSignalIndex === index;
+                        currentSignalIndex++;
+
+                        if (isTarget) {
+                            removed = true;
+                            continue;
+                        }
+                        result.push(item);
+                    } else {
+                        result.push(item);
+                    }
+                }
+                return result;
+            };
+
+            const newSignals = filterSignals(prev.signal);
+            if (!removed) return {};
             const newData: WaveDromData = {
                 ...prev,
-                signal: prev.signal.filter((s) => s !== target),
+                signal: newSignals,
             };
             return { waveformData: newData, ...pushHistory(state, prev) };
         }),
@@ -919,8 +945,14 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     setConfigPanelVisible: (visible) => set({ configPanelVisible: visible }),
     setHoverInfo: (info) => set({ hoverInfo: info }),
     setEditingDataCell: (cell) => set({ editingDataCell: cell }),
+    setEditingDataLabelValue: (value) => set({ editingDataLabelValue: value }),
     openDataLabelEdit: (signalIndex, stepIndex) => {
         const state = get();
+        // 前の編集が確定されずに残っている場合は確定させる
+        if (state.editingDataCell) {
+            state.setDataLabel(state.editingDataCell.signalIndex, state.editingDataCell.stepIndex, state.editingDataLabelValue);
+        }
+
         const flatSignals = getSignalList(state.waveformData.signal);
         if (signalIndex < 0 || signalIndex >= flatSignals.length) return;
         const sig = flatSignals[signalIndex];
@@ -937,7 +969,17 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             src--;
         }
 
-        set({ editingDataCell: { signalIndex, stepIndex: src } });
+        let dataIdx = 0;
+        for (let i = 0; i <= src; i++) {
+            const ch = sig.wave[i];
+            if (ch === '=' || (ch >= '2' && ch <= '9')) {
+                if (i === src) break;
+                dataIdx++;
+            }
+        }
+        const initialLabel = sig.data?.[dataIdx] ?? '';
+
+        set({ editingDataCell: { signalIndex, stepIndex: src }, editingDataLabelValue: initialLabel });
     },
     setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(zoom, 5)) }),
 
