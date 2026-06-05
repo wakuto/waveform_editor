@@ -27,6 +27,11 @@ const TOOLS: { key: WaveTool; label: string; title: string }[] = [
 const BOUNDARY_SNAP_PX = 8;
 const MENU_VIEWPORT_MARGIN = 8;
 const TOOL_MENU_RADIUS = 80;
+const EDITABLE_CONTEXT_MENU_SELECTOR = 'input, textarea, [contenteditable="true"]';
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.min(Math.max(value, min), max);
+}
 
 /** マウスX座標から最も近い境界インデックスを返す */
 function nearestBoundary(relX: number, maxLen: number, cellWidth: number): number {
@@ -190,7 +195,7 @@ const WaveformCanvas: React.FC = () => {
         flatIndex?: number;
         groupIndex?: number;
     } | null>(null);
-    const contextMenuRef = useRef<HTMLDivElement>(null);
+    const contextMenuElementRef = useRef<HTMLDivElement>(null);
 
     const handleContextMenu = useCallback(
         (e: React.MouseEvent, path: number[], type: 'signal' | 'group', name: string, flatIndex?: number, groupIndex?: number) => {
@@ -225,12 +230,12 @@ const WaveformCanvas: React.FC = () => {
     const wasToolMenuOpenRef = useRef(false);
 
     useLayoutEffect(() => {
-        if (!contextMenu || !contextMenuRef.current) return;
-        const menuRect = contextMenuRef.current.getBoundingClientRect();
+        if (!contextMenu || !contextMenuElementRef.current) return;
+        const menuRect = contextMenuElementRef.current.getBoundingClientRect();
         const maxX = Math.max(MENU_VIEWPORT_MARGIN, window.innerWidth - menuRect.width - MENU_VIEWPORT_MARGIN);
         const maxY = Math.max(MENU_VIEWPORT_MARGIN, window.innerHeight - menuRect.height - MENU_VIEWPORT_MARGIN);
-        const clampedX = Math.min(Math.max(contextMenu.x, MENU_VIEWPORT_MARGIN), maxX);
-        const clampedY = Math.min(Math.max(contextMenu.y, MENU_VIEWPORT_MARGIN), maxY);
+        const clampedX = clamp(contextMenu.x, MENU_VIEWPORT_MARGIN, maxX);
+        const clampedY = clamp(contextMenu.y, MENU_VIEWPORT_MARGIN, maxY);
         if (clampedX !== contextMenu.x || clampedY !== contextMenu.y) {
             setContextMenu((prev) => {
                 if (!prev) return prev;
@@ -253,8 +258,16 @@ const WaveformCanvas: React.FC = () => {
             const isEdge = target.closest('.edge-group');
 
             if (isWaveArea && !isEdge) {
-                const x = Math.min(Math.max(e.clientX, TOOL_MENU_RADIUS + MENU_VIEWPORT_MARGIN), window.innerWidth - TOOL_MENU_RADIUS - MENU_VIEWPORT_MARGIN);
-                const y = Math.min(Math.max(e.clientY, TOOL_MENU_RADIUS + MENU_VIEWPORT_MARGIN), window.innerHeight - TOOL_MENU_RADIUS - MENU_VIEWPORT_MARGIN);
+                const x = clamp(
+                    e.clientX,
+                    TOOL_MENU_RADIUS + MENU_VIEWPORT_MARGIN,
+                    window.innerWidth - TOOL_MENU_RADIUS - MENU_VIEWPORT_MARGIN
+                );
+                const y = clamp(
+                    e.clientY,
+                    TOOL_MENU_RADIUS + MENU_VIEWPORT_MARGIN,
+                    window.innerHeight - TOOL_MENU_RADIUS - MENU_VIEWPORT_MARGIN
+                );
                 setToolMenu({ x, y });
                 setHoveredTool(null);
                 isToolMenuOpenRef.current = true;
@@ -609,7 +622,7 @@ const WaveformCanvas: React.FC = () => {
             ref={canvasRef}
             onContextMenu={(e) => {
                 const target = e.target as HTMLElement;
-                if (!target.closest('input, textarea, [contenteditable="true"]')) {
+                if (!target.closest(EDITABLE_CONTEXT_MENU_SELECTOR)) {
                     e.preventDefault();
                 }
             }}
@@ -875,7 +888,7 @@ const WaveformCanvas: React.FC = () => {
             {/* コンテキストメニュー */}
             {contextMenu && (
                 <div
-                    ref={contextMenuRef}
+                    ref={contextMenuElementRef}
                     style={{
                         position: 'fixed',
                         top: contextMenu.y,
