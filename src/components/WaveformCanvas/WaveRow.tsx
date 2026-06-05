@@ -188,9 +188,9 @@ const WaveRow: React.FC<WaveRowProps> = ({
         const rawCh = wave[i];                          // 生の文字（継続判定用）
         const rch = resolved[i];                        // 解決済み文字（描画用）
         const rprev = i > 0 ? resolved[i - 1] : null;  // 解決済み前の文字
-        const isContinue = rawCh === '.';               // このセルが '.' → 左端 < なし
+        const isContinue = rawCh === '.' || rawCh === '|';               // このセルが '.' / '|' → 左端 < なし
         const nextRawCh = i + 1 < wave.length ? wave[i + 1] : null;
-        const isNextContinue = nextRawCh === '.';       // 次のセルが '.' → 右端 > なし
+        const isNextContinue = nextRawCh === '.' || nextRawCh === '|';       // 次のセルが '.' / '|' → 右端 > なし
         const x = i * CELL_WIDTH;
         const seg = getSegmentPath(rch, rprev, x, CELL_WIDTH, isContinue, isNextContinue);
         const isHovered = hoverStep === i;
@@ -265,6 +265,19 @@ const WaveRow: React.FC<WaveRowProps> = ({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeDasharray={rch === 'z' ? '4 3' : undefined}
+                    />
+                )}
+
+                {/* Gap マーカー（上部の縦省略線） */}
+                {rawCh === '|' && (
+                    <line
+                        x1={x + CELL_WIDTH / 2}
+                        y1={0}
+                        x2={x + CELL_WIDTH / 2}
+                        y2={WAVE_TOP - 1}
+                        stroke="#c0c0d0"
+                        strokeWidth={1}
+                        style={{ pointerEvents: 'none' }}
                     />
                 )}
 
