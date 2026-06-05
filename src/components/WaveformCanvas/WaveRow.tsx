@@ -268,18 +268,38 @@ const WaveRow: React.FC<WaveRowProps> = ({
                     />
                 )}
 
-                {/* Gap マーカー（上部の縦省略線） */}
-                {rawCh === '|' && (
-                    <line
-                        x1={x + CELL_WIDTH / 2}
-                        y1={0}
-                        x2={x + CELL_WIDTH / 2}
-                        y2={WAVE_TOP - 1}
-                        stroke="#c0c0d0"
-                        strokeWidth={1}
-                        style={{ pointerEvents: 'none' }}
-                    />
-                )}
+                {/* Gap マーカー（上部の縦2重波線） */}
+                {rawCh === '|' && (() => {
+                    const centerX = x + CELL_WIDTH / 2;
+                    const yTop = 0;
+                    const yBottom = WAVE_TOP - 1;
+                    const h = yBottom - yTop;
+                    const gap = 2.2;
+                    const amp = 1.3;
+                    const buildGapPath = (cx: number) =>
+                        `M ${cx} ${yTop}
+                         C ${cx + amp} ${yTop + h * 0.15}, ${cx - amp} ${yTop + h * 0.35}, ${cx} ${yTop + h * 0.5}
+                         C ${cx + amp} ${yTop + h * 0.65}, ${cx - amp} ${yTop + h * 0.85}, ${cx} ${yBottom}`;
+
+                    return (
+                        <>
+                            <path
+                                d={buildGapPath(centerX - gap)}
+                                fill="none"
+                                stroke="#c0c0d0"
+                                strokeWidth={1}
+                                style={{ pointerEvents: 'none' }}
+                            />
+                            <path
+                                d={buildGapPath(centerX + gap)}
+                                fill="none"
+                                stroke="#c0c0d0"
+                                strokeWidth={1}
+                                style={{ pointerEvents: 'none' }}
+                            />
+                        </>
+                    );
+                })()}
 
                 {/* データラベル */}
                 {label !== undefined && (
