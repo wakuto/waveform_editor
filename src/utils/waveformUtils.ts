@@ -270,7 +270,7 @@ export function resolveWave(wave: string): string[] {
     const result: string[] = [];
     let prev = '0';
     for (const ch of wave) {
-        if (ch === '.') {
+        if (ch === '.' || ch === '|') {
             result.push(prev);
         } else {
             result.push(ch);

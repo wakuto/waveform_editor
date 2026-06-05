@@ -188,9 +188,9 @@ const WaveRow: React.FC<WaveRowProps> = ({
         const rawCh = wave[i];                          // 生の文字（継続判定用）
         const rch = resolved[i];                        // 解決済み文字（描画用）
         const rprev = i > 0 ? resolved[i - 1] : null;  // 解決済み前の文字
-        const isContinue = rawCh === '.';               // このセルが '.' → 左端 < なし
+        const isContinue = rawCh === '.' || rawCh === '|';               // このセルが '.' / '|' → 左端 < なし
         const nextRawCh = i + 1 < wave.length ? wave[i + 1] : null;
-        const isNextContinue = nextRawCh === '.';       // 次のセルが '.' → 右端 > なし
+        const isNextContinue = nextRawCh === '.' || nextRawCh === '|';       // 次のセルが '.' / '|' → 右端 > なし
         const x = i * CELL_WIDTH;
         const seg = getSegmentPath(rch, rprev, x, CELL_WIDTH, isContinue, isNextContinue);
         const isHovered = hoverStep === i;
@@ -267,6 +267,39 @@ const WaveRow: React.FC<WaveRowProps> = ({
                         strokeDasharray={rch === 'z' ? '4 3' : undefined}
                     />
                 )}
+
+                {/* Gap マーカー（縦2重波線） */}
+                {rawCh === '|' && (() => {
+                    const centerX = x + CELL_WIDTH / 2;
+                    const yTop = 1;
+                    const yBottom = ROW_HEIGHT - 1;
+                    const h = yBottom - yTop;
+                    const gap = 2.8;
+                    const amp = 1.8;
+                    const buildGapPath = (cx: number) =>
+                        `M ${cx} ${yTop}
+                         C ${cx + amp} ${yTop + h * 0.15}, ${cx - amp} ${yTop + h * 0.35}, ${cx} ${yTop + h * 0.5}
+                         C ${cx + amp} ${yTop + h * 0.65}, ${cx - amp} ${yTop + h * 0.85}, ${cx} ${yBottom}`;
+
+                    return (
+                        <>
+                            <path
+                                d={buildGapPath(centerX - gap)}
+                                fill="none"
+                                stroke="#c0c0d0"
+                                strokeWidth={1.2}
+                                style={{ pointerEvents: 'none' }}
+                            />
+                            <path
+                                d={buildGapPath(centerX + gap)}
+                                fill="none"
+                                stroke="#c0c0d0"
+                                strokeWidth={1.2}
+                                style={{ pointerEvents: 'none' }}
+                            />
+                        </>
+                    );
+                })()}
 
                 {/* データラベル */}
                 {label !== undefined && (
