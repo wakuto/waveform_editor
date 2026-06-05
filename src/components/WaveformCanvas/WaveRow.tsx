@@ -268,14 +268,14 @@ const WaveRow: React.FC<WaveRowProps> = ({
                     />
                 )}
 
-                {/* Gap マーカー（上部の縦2重波線） */}
+                {/* Gap マーカー（縦2重波線） */}
                 {rawCh === '|' && (() => {
                     const centerX = x + CELL_WIDTH / 2;
-                    const yTop = 0;
-                    const yBottom = WAVE_TOP - 1;
+                    const yTop = 1;
+                    const yBottom = ROW_HEIGHT - 1;
                     const h = yBottom - yTop;
-                    const gap = 2.2;
-                    const amp = 1.3;
+                    const gap = 2.8;
+                    const amp = 1.8;
                     const buildGapPath = (cx: number) =>
                         `M ${cx} ${yTop}
                          C ${cx + amp} ${yTop + h * 0.15}, ${cx - amp} ${yTop + h * 0.35}, ${cx} ${yTop + h * 0.5}
@@ -287,14 +287,14 @@ const WaveRow: React.FC<WaveRowProps> = ({
                                 d={buildGapPath(centerX - gap)}
                                 fill="none"
                                 stroke="#c0c0d0"
-                                strokeWidth={1}
+                                strokeWidth={1.2}
                                 style={{ pointerEvents: 'none' }}
                             />
                             <path
                                 d={buildGapPath(centerX + gap)}
                                 fill="none"
                                 stroke="#c0c0d0"
-                                strokeWidth={1}
+                                strokeWidth={1.2}
                                 style={{ pointerEvents: 'none' }}
                             />
                         </>
