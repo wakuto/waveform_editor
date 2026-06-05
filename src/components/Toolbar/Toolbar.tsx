@@ -1,30 +1,15 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useWaveformStore } from '../../store/useWaveformStore';
 import type { WaveTool } from '../../types/wavedrom';
 import { DEFAULT_WAVEFORM } from '../../types/wavedrom';
 import { downloadSVG, downloadPNG } from '../../utils/exportUtils';
 import styles from './Toolbar.module.css';
 
-const TOOLS: { key: WaveTool; label: string; title: string }[] = [
-    { key: '0', label: '0', title: 'Low' },
-    { key: '1', label: '1', title: 'High' },
-    { key: 'p', label: 'p', title: 'Posedge Clock' },
-    { key: 'n', label: 'n', title: 'Negedge Clock' },
-    { key: 'P', label: 'P', title: 'Posedge Trigger' },
-    { key: 'N', label: 'N', title: 'Negedge Trigger' },
-    { key: 'z', label: 'z', title: 'High-Z' },
-    { key: 'x', label: 'x', title: 'Undefined' },
-    { key: '=', label: '=', title: 'Data' },
-    { key: '2', label: '2', title: 'Data (Orange)' },
-    { key: '3', label: '3', title: 'Data (Green)' },
-    { key: '4', label: '4', title: 'Data (Red)' },
-    { key: '.', label: '.', title: 'Continue' },
-    { key: '|', label: '|', title: 'Gap' },
-];
-
 import { formatWaveDromJSON } from '../../utils/jsonFormatter';
+import { useI18n } from '../../i18n';
 
 const Toolbar: React.FC = () => {
+    const { locale, setLocale, t } = useI18n();
     const selectedTool = useWaveformStore((s) => s.selectedTool);
     const setSelectedTool = useWaveformStore((s) => s.setSelectedTool);
     const setWaveformData = useWaveformStore((s) => s.setWaveformData);
@@ -51,13 +36,29 @@ const Toolbar: React.FC = () => {
     const pasteAtCursor = useWaveformStore((s) => s.pasteAtCursor);
 
     const isSelectMode = selectedTool === 'select';
+    const tools: { key: WaveTool; label: string; title: string }[] = useMemo(() => ([
+        { key: '0', label: '0', title: t('toolbar.tool.low') },
+        { key: '1', label: '1', title: t('toolbar.tool.high') },
+        { key: 'p', label: 'p', title: t('toolbar.tool.posedgeClock') },
+        { key: 'n', label: 'n', title: t('toolbar.tool.negedgeClock') },
+        { key: 'P', label: 'P', title: t('toolbar.tool.posedgeTrigger') },
+        { key: 'N', label: 'N', title: t('toolbar.tool.negedgeTrigger') },
+        { key: 'z', label: 'z', title: t('toolbar.tool.highZ') },
+        { key: 'x', label: 'x', title: t('toolbar.tool.undefined') },
+        { key: '=', label: '=', title: t('toolbar.tool.data') },
+        { key: '2', label: '2', title: t('toolbar.tool.dataOrange') },
+        { key: '3', label: '3', title: t('toolbar.tool.dataGreen') },
+        { key: '4', label: '4', title: t('toolbar.tool.dataRed') },
+        { key: '.', label: '.', title: t('toolbar.tool.continue') },
+        { key: '|', label: '|', title: t('toolbar.tool.gap') },
+    ]), [t]);
 
     /** 新規作成 */
     const handleNew = useCallback(() => {
-        if (window.confirm('新規作成すると現在の編集内容が失われます。続けますか？')) {
+        if (window.confirm(t('toolbar.confirmNew'))) {
             setWaveformData(DEFAULT_WAVEFORM, false);
         }
-    }, [setWaveformData]);
+    }, [setWaveformData, t]);
 
     /** ファイルを開く */
     const handleOpen = useCallback(() => {
@@ -73,13 +74,13 @@ const Toolbar: React.FC = () => {
                     const parsed = JSON.parse(ev.target?.result as string);
                     setWaveformData(parsed, false);
                 } catch {
-                    alert('JSONの解析に失敗しました。');
+                    alert(t('toolbar.openJsonParseError'));
                 }
             };
             reader.readAsText(file);
         };
         input.click();
-    }, [setWaveformData]);
+    }, [setWaveformData, t]);
 
     /** 保存（ダウンロード） */
     const handleSave = useCallback(() => {
@@ -94,25 +95,25 @@ const Toolbar: React.FC = () => {
     }, [waveformData]);
 
     const handleExportSVG = useCallback(() => downloadSVG(waveformData), [waveformData]);
-    const handleExportPNG = useCallback(() => downloadPNG(waveformData), [waveformData]);
+    const handleExportPNG = useCallback(() => downloadPNG(waveformData, 'waveform.png', t('toolbar.exportPngFailed')), [waveformData, t]);
 
     return (
         <div className={styles.toolbar}>
             {/* ファイル操作 */}
             <div className={styles.group}>
-                <button className={styles.btn} onClick={handleNew} title="新規作成 (Ctrl+N)">新規</button>
-                <button className={styles.btn} onClick={handleOpen} title="開く (Ctrl+O)">開く</button>
-                <button className={styles.btn} onClick={handleSave} title="保存 (Ctrl+S)">保存</button>
-                <button className={styles.btn} onClick={handleExportSVG} title="SVGエクスポート">SVG</button>
-                <button className={styles.btn} onClick={handleExportPNG} title="PNGエクスポート">PNG</button>
+                <button className={styles.btn} onClick={handleNew} title={t('toolbar.title.new')}>{t('toolbar.new')}</button>
+                <button className={styles.btn} onClick={handleOpen} title={t('toolbar.title.open')}>{t('toolbar.open')}</button>
+                <button className={styles.btn} onClick={handleSave} title={t('toolbar.title.save')}>{t('toolbar.save')}</button>
+                <button className={styles.btn} onClick={handleExportSVG} title={t('toolbar.title.exportSvg')}>{t('toolbar.exportSvg')}</button>
+                <button className={styles.btn} onClick={handleExportPNG} title={t('toolbar.title.exportPng')}>{t('toolbar.exportPng')}</button>
             </div>
 
             <div className={styles.separator} />
 
             {/* Undo / Redo */}
             <div className={styles.group}>
-                <button className={styles.btn} onClick={undo} disabled={!canUndo()} title="元に戻す (Ctrl+Z)">↩ Undo</button>
-                <button className={styles.btn} onClick={redo} disabled={!canRedo()} title="やり直す (Ctrl+Shift+Z)">↪ Redo</button>
+                <button className={styles.btn} onClick={undo} disabled={!canUndo()} title={t('toolbar.title.undo')}>{t('toolbar.undo')}</button>
+                <button className={styles.btn} onClick={redo} disabled={!canRedo()} title={t('toolbar.title.redo')}>{t('toolbar.redo')}</button>
             </div>
 
             <div className={styles.separator} />
@@ -122,16 +123,16 @@ const Toolbar: React.FC = () => {
                 <button
                     className={`${styles.btn} ${isSelectMode ? styles.active : ''}`}
                     onClick={() => setSelectedTool('select')}
-                    title="選択ツール (S)"
+                    title={t('toolbar.title.select')}
                 >
-                    ↖ 選択
+                    {t('toolbar.select')}
                 </button>
                 <button
                     className={`${styles.btn} ${selectedTool === 'edge' ? styles.active : ''}`}
                     onClick={() => setSelectedTool('edge')}
-                    title="エッジツール (E)"
+                    title={t('toolbar.title.edge')}
                 >
-                    ↗ エッジ
+                    {t('toolbar.edge')}
                 </button>
                 {isSelectMode && (
                     <>
@@ -139,7 +140,7 @@ const Toolbar: React.FC = () => {
                             className={styles.toolBtn}
                             onClick={() => insertStepsAtCursor()}
                             disabled={insertCursor === null}
-                            title="カーソル位置にステップを挿入 (Insert)"
+                            title={t('toolbar.title.insert')}
                         >
                             ➕
                         </button>
@@ -147,7 +148,7 @@ const Toolbar: React.FC = () => {
                             className={styles.toolBtn}
                             onClick={deleteSelectedSteps}
                             disabled={!stepSelection}
-                            title="選択範囲を削除 (Delete)"
+                            title={t('toolbar.title.deleteSelection')}
                         >
                             🗑️
                         </button>
@@ -155,7 +156,7 @@ const Toolbar: React.FC = () => {
                             className={styles.toolBtn}
                             onClick={copySteps}
                             disabled={!stepSelection}
-                            title="コピー (Ctrl+C)"
+                            title={t('toolbar.title.copy')}
                         >
                             📄
                         </button>
@@ -163,7 +164,7 @@ const Toolbar: React.FC = () => {
                             className={styles.toolBtn}
                             onClick={cutSteps}
                             disabled={!stepSelection}
-                            title="カット (Ctrl+X)"
+                            title={t('toolbar.title.cut')}
                         >
                             ✂️
                         </button>
@@ -171,7 +172,7 @@ const Toolbar: React.FC = () => {
                             className={styles.toolBtn}
                             onClick={pasteAtCursor}
                             disabled={!stepClipboard || insertCursor === null}
-                            title="ペースト (Ctrl+V)"
+                            title={t('toolbar.title.paste')}
                         >
                             📋
                         </button>
@@ -183,7 +184,7 @@ const Toolbar: React.FC = () => {
 
             {/* ツール選択パレット */}
             <div className={styles.group}>
-                {TOOLS.map((t) => (
+                {tools.map((t) => (
                     <button
                         key={t.key}
                         className={`${styles.toolBtn} ${selectedTool === t.key ? styles.active : ''}`}
@@ -202,23 +203,30 @@ const Toolbar: React.FC = () => {
                 <button
                     className={`${styles.btn} ${configPanelVisible ? styles.active : ''}`}
                     onClick={() => setConfigPanelVisible(!configPanelVisible)}
-                    title="設定パネルを表示/非表示"
+                    title={t('toolbar.title.settingsToggle')}
                 >
-                    ⚙ 設定
+                    {t('toolbar.settings')}
                 </button>
                 <button
                     className={`${styles.btn} ${previewVisible ? styles.active : ''}`}
                     onClick={() => setPreviewVisible(!previewVisible)}
-                    title="WaveDromプレビューを表示/非表示"
+                    title={t('toolbar.title.previewToggle')}
                 >
-                    👁 プレビュー
+                    {t('toolbar.preview')}
                 </button>
                 <button
                     className={`${styles.btn} ${jsonPanelVisible ? styles.active : ''}`}
                     onClick={() => setJsonPanelVisible(!jsonPanelVisible)}
-                    title="JSONエディタを表示/非表示"
+                    title={t('toolbar.title.jsonToggle')}
                 >
                     {'{ } JSON'}
+                </button>
+                <button
+                    className={styles.btn}
+                    onClick={() => setLocale(locale === 'ja' ? 'en' : 'ja')}
+                    title={t('toolbar.title.languageSwitch')}
+                >
+                    {t('toolbar.languageSwitch')}
                 </button>
             </div>
         </div>

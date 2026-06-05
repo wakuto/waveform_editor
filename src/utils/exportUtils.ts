@@ -60,10 +60,10 @@ export function svgToPNGBlob(svgStr: string): Promise<Blob | null> {
 }
 
 /** PNG ダウンロード */
-export async function downloadPNG(data: WaveDromData, filename = 'waveform.png'): Promise<void> {
+export async function downloadPNG(data: WaveDromData, filename = 'waveform.png', errorMessage = 'Failed to export PNG.'): Promise<void> {
     const svgStr = renderToSVGString(data);
     const blob = await svgToPNGBlob(svgStr);
-    if (!blob) { alert('PNG エクスポートに失敗しました。'); return; }
+    if (!blob) { alert(errorMessage); return; }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

@@ -1,8 +1,10 @@
 import React from 'react';
 import { useWaveformStore } from '../../store/useWaveformStore';
 import styles from './ConfigPanel.module.css';
+import { useI18n } from '../../i18n';
 
 const ConfigPanel: React.FC = () => {
+    const { t } = useI18n();
     const waveformData = useWaveformStore((s) => s.waveformData);
     const setWaveformData = useWaveformStore((s) => s.setWaveformData);
 
@@ -105,58 +107,58 @@ const ConfigPanel: React.FC = () => {
 
     return (
         <div className={styles.configPanel}>
-            <div className={styles.header}>設定 (head / foot / config)</div>
+            <div className={styles.header}>{t('config.header')}</div>
             <div className={styles.content}>
                 <div className={styles.section}>
-                    <div className={styles.sectionTitle}>Head</div>
+                    <div className={styles.sectionTitle}>{t('config.head')}</div>
                     <div className={styles.field}>
-                        <label>Text:</label>
-                        <input type="text" value={waveformData.head?.text || ''} onChange={handleHeadTextChange} placeholder="Title" />
+                        <label>{t('config.label.text')}:</label>
+                        <input type="text" value={waveformData.head?.text || ''} onChange={handleHeadTextChange} placeholder={t('config.placeholder.title')} />
                     </div>
                     <div className={styles.field}>
-                        <label>Tick:</label>
-                        <input type="number" value={waveformData.head?.tick ?? ''} onChange={handleHeadTickChange} placeholder="Start tick" />
+                        <label>{t('config.label.tick')}:</label>
+                        <input type="number" value={waveformData.head?.tick ?? ''} onChange={handleHeadTickChange} placeholder={t('config.placeholder.startTick')} />
                     </div>
                     <div className={styles.field}>
-                        <label>Tock:</label>
-                        <input type="number" value={waveformData.head?.tock ?? ''} onChange={handleHeadTockChange} placeholder="Start tock" />
+                        <label>{t('config.label.tock')}:</label>
+                        <input type="number" value={waveformData.head?.tock ?? ''} onChange={handleHeadTockChange} placeholder={t('config.placeholder.startTock')} />
                     </div>
                     <div className={styles.field}>
-                        <label>Every:</label>
-                        <input type="number" value={waveformData.head?.every ?? ''} onChange={handleHeadEveryChange} placeholder="Tick interval" />
-                    </div>
-                </div>
-
-                <div className={styles.section}>
-                    <div className={styles.sectionTitle}>Foot</div>
-                    <div className={styles.field}>
-                        <label>Text:</label>
-                        <input type="text" value={waveformData.foot?.text || ''} onChange={handleFootTextChange} placeholder="Footer text" />
-                    </div>
-                    <div className={styles.field}>
-                        <label>Tick:</label>
-                        <input type="number" value={waveformData.foot?.tick ?? ''} onChange={handleFootTickChange} placeholder="Start tick" />
-                    </div>
-                    <div className={styles.field}>
-                        <label>Tock:</label>
-                        <input type="number" value={waveformData.foot?.tock ?? ''} onChange={handleFootTockChange} placeholder="Start tock" />
-                    </div>
-                    <div className={styles.field}>
-                        <label>Every:</label>
-                        <input type="number" value={waveformData.foot?.every ?? ''} onChange={handleFootEveryChange} placeholder="Tick interval" />
+                        <label>{t('config.label.every')}:</label>
+                        <input type="number" value={waveformData.head?.every ?? ''} onChange={handleHeadEveryChange} placeholder={t('config.placeholder.tickInterval')} />
                     </div>
                 </div>
 
                 <div className={styles.section}>
-                    <div className={styles.sectionTitle}>Config</div>
+                    <div className={styles.sectionTitle}>{t('config.foot')}</div>
                     <div className={styles.field}>
-                        <label>HScale:</label>
-                        <input type="number" value={waveformData.config?.hscale ?? ''} onChange={handleConfigHscaleChange} placeholder="Horizontal scale" />
+                        <label>{t('config.label.text')}:</label>
+                        <input type="text" value={waveformData.foot?.text || ''} onChange={handleFootTextChange} placeholder={t('config.placeholder.footerText')} />
                     </div>
                     <div className={styles.field}>
-                        <label>Skin:</label>
+                        <label>{t('config.label.tick')}:</label>
+                        <input type="number" value={waveformData.foot?.tick ?? ''} onChange={handleFootTickChange} placeholder={t('config.placeholder.startTick')} />
+                    </div>
+                    <div className={styles.field}>
+                        <label>{t('config.label.tock')}:</label>
+                        <input type="number" value={waveformData.foot?.tock ?? ''} onChange={handleFootTockChange} placeholder={t('config.placeholder.startTock')} />
+                    </div>
+                    <div className={styles.field}>
+                        <label>{t('config.label.every')}:</label>
+                        <input type="number" value={waveformData.foot?.every ?? ''} onChange={handleFootEveryChange} placeholder={t('config.placeholder.tickInterval')} />
+                    </div>
+                </div>
+
+                <div className={styles.section}>
+                    <div className={styles.sectionTitle}>{t('config.body')}</div>
+                    <div className={styles.field}>
+                        <label>{t('config.label.hscale')}:</label>
+                        <input type="number" value={waveformData.config?.hscale ?? ''} onChange={handleConfigHscaleChange} placeholder={t('config.placeholder.hscale')} />
+                    </div>
+                    <div className={styles.field}>
+                        <label>{t('config.label.skin')}:</label>
                         <select value={waveformData.config?.skin || ''} onChange={handleConfigSkinChange}>
-                            <option value="">Default</option>
+                            <option value="">{t('config.skin.default')}</option>
                             <option value="narrow">Narrow</option>
                             <option value="lowkey">Lowkey</option>
                         </select>

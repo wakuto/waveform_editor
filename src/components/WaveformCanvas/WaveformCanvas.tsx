@@ -5,6 +5,7 @@ import { getSignalList, BASE_CELL_WIDTH, ROW_HEIGHT, LABEL_WIDTH } from '../../u
 import WaveRow from './WaveRow';
 import EdgeOverlay from './EdgeOverlay';
 import styles from './WaveformCanvas.module.css';
+import { useI18n } from '../../i18n';
 
 const TOOLS: { key: WaveTool; label: string; title: string }[] = [
     { key: '0', label: '0', title: 'Low' },
@@ -45,6 +46,7 @@ function isNearBoundary(relX: number, cellWidth: number): boolean {
 }
 
 const WaveformCanvas: React.FC = () => {
+    const { t } = useI18n();
     const waveformData = useWaveformStore((s) => s.waveformData);
     const zoom = useWaveformStore((s) => s.zoom);
     const CELL_WIDTH = BASE_CELL_WIDTH * zoom;
@@ -858,10 +860,10 @@ const WaveformCanvas: React.FC = () => {
                     onDragLeave={() => setDragOver(null)}
                 >
                     <button className={styles.addButton} onClick={() => addSignal()}>
-                        + 信号を追加
+                        {t('waveform.addSignal')}
                     </button>
                     <button className={styles.addButton} onClick={() => {
-                        addGroup('New Group');
+                        addGroup(t('waveform.newGroupName'));
                         // 新しく追加されたグループを編集状態にする
                         // groupIndexは現在のグループ数になる
                         let groupCount = 0;
@@ -877,10 +879,10 @@ const WaveformCanvas: React.FC = () => {
                         // setTimeoutを使って、レンダリング後にフォーカスが当たるようにする
                         setTimeout(() => {
                             setEditingGroupIndex(groupCount);
-                            setEditingGroupName('New Group');
+                            setEditingGroupName(t('waveform.newGroupName'));
                         }, 0);
                     }} style={{ marginLeft: '8px' }}>
-                        + グループを追加
+                        {t('waveform.addGroup')}
                     </button>
                 </div>
             </div>
@@ -910,12 +912,12 @@ const WaveformCanvas: React.FC = () => {
                             setContextMenu(null);
                         }}
                     >
-                        信号を追加 (Add Signal)
+                        {t('waveform.menu.addSignal')}
                     </div>
                     <div
                         className={styles.contextMenuItem}
                         onClick={() => {
-                            useWaveformStore.getState().insertGroup(contextMenu.path, 'New Group');
+                            useWaveformStore.getState().insertGroup(contextMenu.path, t('waveform.newGroupName'));
                             const newPath = [...contextMenu.path];
                             newPath[newPath.length - 1]++;
 
@@ -938,13 +940,13 @@ const WaveformCanvas: React.FC = () => {
                                 traverse(signals, []);
                                 if (targetGroupIndex !== -1) {
                                     setEditingGroupIndex(targetGroupIndex);
-                                    setEditingGroupName('New Group');
+                                    setEditingGroupName(t('waveform.newGroupName'));
                                 }
                             }, 0);
                             setContextMenu(null);
                         }}
                     >
-                        グループを追加 (Add Group)
+                        {t('waveform.menu.addGroup')}
                     </div>
                     <div style={{ height: '1px', background: '#4a9df0', margin: '4px 0', opacity: 0.3 }} />
                     <div
@@ -954,7 +956,7 @@ const WaveformCanvas: React.FC = () => {
                             setContextMenu(null);
                         }}
                     >
-                        複製 (Duplicate)
+                        {t('waveform.menu.duplicate')}
                     </div>
                     <div
                         className={styles.contextMenuItem}
@@ -963,7 +965,7 @@ const WaveformCanvas: React.FC = () => {
                             setContextMenu(null);
                         }}
                     >
-                        コピー (Copy)
+                        {t('waveform.menu.copy')}
                     </div>
                     <div
                         className={`${styles.contextMenuItem} ${!useWaveformStore.getState().itemClipboard ? styles.contextMenuItemDisabled : ''}`}
@@ -975,14 +977,17 @@ const WaveformCanvas: React.FC = () => {
                             setContextMenu(null);
                         }}
                     >
-                        ペースト (Paste)
+                        {t('waveform.menu.paste')}
                     </div>
                     <div style={{ height: '1px', background: '#4a9df0', margin: '4px 0', opacity: 0.3 }} />
                     <div
                         className={styles.contextMenuItem}
                         style={{ color: '#ff6b6b' }}
                         onClick={() => {
-                            if (window.confirm(`${contextMenu.type === 'group' ? 'グループ' : '信号'} "${contextMenu.name}" を削除しますか？`)) {
+                            if (window.confirm(t('waveform.confirmDelete', {
+                                itemType: contextMenu.type === 'group' ? t('waveform.item.group') : t('waveform.item.signal'),
+                                name: contextMenu.name,
+                            }))) {
                                 if (contextMenu.type === 'group' && contextMenu.groupIndex !== undefined) {
                                     const removeGroup = useWaveformStore.getState().removeGroup;
                                     if (removeGroup) removeGroup(contextMenu.groupIndex);
@@ -993,7 +998,7 @@ const WaveformCanvas: React.FC = () => {
                             setContextMenu(null);
                         }}
                     >
-                        削除 (Delete)
+                        {t('waveform.menu.delete')}
                     </div>
                 </div>
             )}

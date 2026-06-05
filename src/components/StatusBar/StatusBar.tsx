@@ -2,6 +2,7 @@ import React from 'react';
 import { useWaveformStore } from '../../store/useWaveformStore';
 import { getSignalList } from '../../utils/waveformUtils';
 import styles from './StatusBar.module.css';
+import { useI18n } from '../../i18n';
 
 const TOOL_NAMES: Record<string, string> = {
     '0': 'Low (0)',
@@ -21,11 +22,10 @@ const TOOL_NAMES: Record<string, string> = {
     '9': 'Data Lime (9)',
     '.': 'Continue (.)',
     '|': 'Gap (|)',
-    'select': '↖ 選択',
-    'edge': '↗ エッジ',
 };
 
 const StatusBar: React.FC = () => {
+    const { t } = useI18n();
     const hoverInfo = useWaveformStore((s) => s.hoverInfo);
     const waveformData = useWaveformStore((s) => s.waveformData);
     const selectedTool = useWaveformStore((s) => s.selectedTool);
@@ -36,6 +36,11 @@ const StatusBar: React.FC = () => {
     const maxLen = signals.reduce((m, s) => Math.max(m, s.wave.length), 0);
 
     const isSelectMode = selectedTool === 'select';
+    const toolName = selectedTool === 'select'
+        ? t('status.tool.select')
+        : selectedTool === 'edge'
+            ? t('status.tool.edge')
+            : (TOOL_NAMES[selectedTool] ?? selectedTool);
 
     const hoveredSignalName =
         hoverInfo !== null ? (signals[hoverInfo.signalIndex]?.name ?? '') : null;
@@ -45,7 +50,7 @@ const StatusBar: React.FC = () => {
             {/* カーソル位置 or ホバー位置 */}
             {isSelectMode ? (
                 <span className={styles.item}>
-                    カーソル: {insertCursor !== null ? `境界 ${insertCursor}` : '—'}
+                    {t('status.cursor')}: {insertCursor !== null ? t('status.boundary', { index: insertCursor }) : '—'}
                 </span>
             ) : hoveredSignalName !== null ? (
                 <span className={styles.item}>
@@ -61,15 +66,15 @@ const StatusBar: React.FC = () => {
             {isSelectMode && (
                 <>
                     <span className={styles.item}>
-                        選択: {stepSelection ? `${stepSelection.from}〜${stepSelection.to}` : '—'}
+                        {t('status.selection')}: {stepSelection ? `${stepSelection.from}〜${stepSelection.to}` : '—'}
                     </span>
                     <span className={styles.separator}>｜</span>
                 </>
             )}
 
-            <span className={styles.item}>ツール: {TOOL_NAMES[selectedTool] ?? selectedTool}</span>
+            <span className={styles.item}>{t('status.tool')}: {toolName}</span>
             <span className={styles.separator}>｜</span>
-            <span className={styles.item}>{signals.length} 信号 × {maxLen} ステップ</span>
+            <span className={styles.item}>{t('status.signalsSteps', { signals: signals.length, steps: maxLen })}</span>
         </div>
     );
 };

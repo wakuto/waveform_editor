@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { registerSW } from 'virtual:pwa-register'
+import { I18nProvider } from './I18nProvider'
 
 registerSW({
   onNeedRefresh() {
@@ -15,6 +16,8 @@ registerSW({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <I18nProvider>
+      <App />
+    </I18nProvider>
   </StrictMode>,
 )

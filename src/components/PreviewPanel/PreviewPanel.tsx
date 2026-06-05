@@ -6,6 +6,7 @@ import narrowSkin from 'wavedrom/skins/narrow.js';
 // @ts-expect-error: no types for skins
 import lowkeySkin from 'wavedrom/skins/lowkey.js';
 import styles from './PreviewPanel.module.css';
+import { useI18n } from '../../i18n';
 
 const allSkins = {
     ...waveSkin,
@@ -14,6 +15,7 @@ const allSkins = {
 };
 
 const PreviewPanel: React.FC = () => {
+    const { t } = useI18n();
     const waveformData = useWaveformStore((s) => s.waveformData);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -28,14 +30,14 @@ const PreviewPanel: React.FC = () => {
                 containerRef.current.innerHTML = svgString;
             } catch (e) {
                 console.error('WaveDrom rendering error:', e);
-                containerRef.current.innerHTML = '<div style="color: red; padding: 10px;">レンダリングエラーが発生しました</div>';
+                containerRef.current.innerHTML = `<div style="color: red; padding: 10px;">${t('preview.renderError')}</div>`;
             }
         }
-    }, [waveformData]);
+    }, [waveformData, t]);
 
     return (
         <div className={styles.previewPanel}>
-            <div className={styles.header}>WaveDrom プレビュー</div>
+            <div className={styles.header}>{t('preview.header')}</div>
             <div className={styles.content} ref={containerRef}>
                 {/* ここにWaveDromのSVGがレンダリングされる */}
             </div>
