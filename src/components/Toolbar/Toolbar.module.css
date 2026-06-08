@@ -15,6 +15,10 @@
     gap: 2px;
 }
 
+.rightAlignedGroup {
+    margin-left: auto;
+}
+
 .separator {
     width: 1px;
     height: 24px;
@@ -84,4 +88,49 @@
     border-color: #6ab8ff;
     color: #fff;
     box-shadow: 0 0 6px rgba(74, 157, 240, 0.5);
+}
+
+.edgeShapeBtn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    width: 32px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.edgeShapeBtn svg {
+    stroke: #b0b8cc;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.edgeShapeBtn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.edgeShapeBtn:hover:not(:disabled) svg {
+    stroke: #fff;
+}
+
+.edgeShapeBtn.active {
+    background: #4a9df0;
+    border-color: #6ab8ff;
+    box-shadow: 0 0 6px rgba(74, 157, 240, 0.5);
+}
+
+.edgeShapeBtn.active svg {
+    stroke: #fff;
+}
+
+.edgeShapeBtn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
 }

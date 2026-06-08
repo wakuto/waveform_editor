@@ -1,8 +1,8 @@
 .panel {
     display: flex;
     flex-direction: column;
-    width: 320px;
-    min-width: 240px;
+    flex: 1;
+    height: 100%;
     background: #12122a;
     border-left: 1px solid #2a2a4a;
     overflow: hidden;

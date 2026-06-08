@@ -5,6 +5,7 @@ import JsonEditor from './components/JsonEditor/JsonEditor';
 import ConfigPanel from './components/ConfigPanel/ConfigPanel';
 import PreviewPanel from './components/PreviewPanel/PreviewPanel';
 import StatusBar from './components/StatusBar/StatusBar';
+import Resizer from './components/Resizer/Resizer';
 import { useWaveformStore } from './store/useWaveformStore';
 import { formatWaveDromJSON } from './utils/jsonFormatter';
 import type { WaveTool } from './types/wavedrom';
@@ -43,6 +44,10 @@ const App: React.FC = () => {
   const stepSelection = useWaveformStore((s) => s.stepSelection);
   const insertCursor = useWaveformStore((s) => s.insertCursor);
   const stepClipboard = useWaveformStore((s) => s.stepClipboard);
+
+  const [previewHeight, setPreviewHeight] = React.useState(250);
+  const [configWidth, setConfigWidth] = React.useState(300);
+  const [jsonWidth, setJsonWidth] = React.useState(320);
 
   // LocalStorageからの復元（初回マウント時のみ）
   useEffect(() => {
@@ -131,10 +136,31 @@ const App: React.FC = () => {
       <div className={styles.main}>
         <div className={styles.canvasArea}>
           <WaveformCanvas />
-          {previewVisible && <PreviewPanel />}
+          {previewVisible && (
+            <>
+              <Resizer direction="vertical" onResize={(delta) => setPreviewHeight(h => Math.max(100, h + delta))} />
+              <div style={{ height: previewHeight, display: 'flex', flexDirection: 'column' }}>
+                <PreviewPanel />
+              </div>
+            </>
+          )}
         </div>
-        {configPanelVisible && <ConfigPanel />}
-        {jsonPanelVisible && <JsonEditor />}
+        {configPanelVisible && (
+          <>
+            <Resizer direction="horizontal" onResize={(delta) => setConfigWidth(w => Math.max(150, w + delta))} />
+            <div style={{ width: configWidth, display: 'flex', flexDirection: 'column' }}>
+              <ConfigPanel />
+            </div>
+          </>
+        )}
+        {jsonPanelVisible && (
+          <>
+            <Resizer direction="horizontal" onResize={(delta) => setJsonWidth(w => Math.max(150, w + delta))} />
+            <div style={{ width: jsonWidth, display: 'flex', flexDirection: 'column' }}>
+              <JsonEditor />
+            </div>
+          </>
+        )}
       </div>
       <StatusBar />
     </div>

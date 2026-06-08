@@ -14,6 +14,8 @@ interface WaveformStore extends AppState {
     setCellRangeWithContinue: (signalIndex: number, dragStartStep: number, currentStep: number, value: string, pushHist?: boolean) => void;
     /** ドラッグ開始時に現在の状態を1回だけ undo スタックに積む */
     beginDragEdit: () => void;
+    /** ドラッグをキャンセルし、開始前の状態に戻す */
+    cancelDragEdit: () => void;
     setDataLabel: (signalIndex: number, stepIndex: number, label: string) => void;
 
     // 信号管理
@@ -62,6 +64,12 @@ interface WaveformStore extends AppState {
     setEditingDataLabelValue: (value: string) => void;
     openDataLabelEdit: (signalIndex: number, stepIndex: number) => void;
     setZoom: (zoom: number) => void;
+    
+    // エッジ管理
+    setEdgeShape: (shape: AppState['edgeShape']) => void;
+    setEdgeStartArrow: (arrow: boolean) => void;
+    setEdgeEndArrow: (arrow: boolean) => void;
+    setSelectedEdgeIndex: (index: number | null) => void;
 
     // Undo/Redo
     undo: () => void;
@@ -71,7 +79,8 @@ interface WaveformStore extends AppState {
 }
 
 function pushHistory(state: AppState, prev: WaveDromData): Pick<AppState, 'undoStack' | 'redoStack'> {
-    const undoStack = [...state.undoStack, prev].slice(-MAX_HISTORY);
+    const deepPrev = JSON.parse(JSON.stringify(prev));
+    const undoStack = [...state.undoStack, deepPrev].slice(-MAX_HISTORY);
     return { undoStack, redoStack: [] };
 }
 
@@ -444,6 +453,10 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     stepSelection: null,
     stepClipboard: null,
     itemClipboard: null,
+    edgeShape: '~',
+    edgeStartArrow: false,
+    edgeEndArrow: true,
+    selectedEdgeIndex: null,
 
     setWaveformData: (data, pushHist = true) =>
         set((state) => ({
@@ -463,6 +476,11 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             });
             return { waveformData: newData, ...(pushHist ? pushHistory(state, prev) : {}) };
         }),
+        
+    setEdgeShape: (shape) => set({ edgeShape: shape }),
+    setEdgeStartArrow: (arrow) => set({ edgeStartArrow: arrow }),
+    setEdgeEndArrow: (arrow) => set({ edgeEndArrow: arrow }),
+    setSelectedEdgeIndex: (index) => set({ selectedEdgeIndex: index }),
 
     setCellRange: (signalIndex, startStep, endStep, value) =>
         set((state) => {
@@ -536,9 +554,19 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
 
     beginDragEdit: () =>
         set((state) => ({
-            undoStack: [...state.undoStack, state.waveformData].slice(-MAX_HISTORY),
+            undoStack: [...state.undoStack, JSON.parse(JSON.stringify(state.waveformData))].slice(-MAX_HISTORY),
             redoStack: [],
         })),
+
+    cancelDragEdit: () =>
+        set((state) => {
+            if (state.undoStack.length === 0) return {};
+            return {
+                waveformData: JSON.parse(JSON.stringify(state.undoStack[state.undoStack.length - 1])),
+                undoStack: state.undoStack.slice(0, -1),
+                redoStack: [],
+            };
+        }),
 
     setDataLabel: (signalIndex, stepIndex, label) =>
         set((state) => {
@@ -1196,9 +1224,9 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const undoStack = [...state.undoStack];
             const prev = undoStack.pop()!;
             return {
-                waveformData: prev,
+                waveformData: JSON.parse(JSON.stringify(prev)),
                 undoStack,
-                redoStack: [state.waveformData, ...state.redoStack],
+                redoStack: [JSON.parse(JSON.stringify(state.waveformData)), ...state.redoStack],
             };
         }),
 
@@ -1208,9 +1236,9 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const redoStack = [...state.redoStack];
             const next = redoStack.shift()!;
             return {
-                waveformData: next,
+                waveformData: JSON.parse(JSON.stringify(next)),
+                undoStack: [...state.undoStack, JSON.parse(JSON.stringify(state.waveformData))],
                 redoStack,
-                undoStack: [...state.undoStack, state.waveformData],
             };
         }),
 

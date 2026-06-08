@@ -92,6 +92,14 @@ export interface AppState {
     stepClipboard: StepClipboard | null;
     /** 信号・グループのクリップボード */
     itemClipboard: WaveSignalOrGroup | null;
+    /** エッジの線形状 */
+    edgeShape: '~' | '-' | '-~' | '~-' | '-|' | '|-' | '-|-' | '+';
+    /** エッジの始点矢印 */
+    edgeStartArrow: boolean;
+    /** エッジの終点矢印 */
+    edgeEndArrow: boolean;
+    /** 選択中のエッジインデックス（クリックで選択した既存エッジ） */
+    selectedEdgeIndex: number | null;
 }
 
 /** デフォルトの初期波形データ */

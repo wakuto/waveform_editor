@@ -1,0 +1,21 @@
+.resizer {
+    background: #1a1a4a;
+    transition: background 0.15s;
+    z-index: 10;
+}
+
+.resizer:hover, .resizer:active {
+    background: #4a9df0;
+}
+
+.horizontal {
+    width: 6px;
+    cursor: col-resize;
+    flex-shrink: 0;
+}
+
+.vertical {
+    height: 6px;
+    cursor: row-resize;
+    flex-shrink: 0;
+}

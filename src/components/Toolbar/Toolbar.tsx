@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useWaveformStore } from '../../store/useWaveformStore';
-import type { WaveTool } from '../../types/wavedrom';
+import type { WaveTool, AppState } from '../../types/wavedrom';
 import { DEFAULT_WAVEFORM } from '../../types/wavedrom';
 import { downloadSVG, downloadPNG } from '../../utils/exportUtils';
 import styles from './Toolbar.module.css';
@@ -20,6 +20,20 @@ const TOOLS: { key: WaveTool; label: string; title: string }[] = [
     { key: '4', label: '4', title: 'Data (Red)' },
     { key: '.', label: '.', title: 'Continue' },
     { key: '|', label: '|', title: 'Gap' },
+];
+
+const EDGE_SHAPES: { key: AppState['edgeShape']; path: string; title: string; category: string }[] = [
+    // 曲線系
+    { key: '~', path: 'M2,3 C12,3 12,13 22,13', title: 'S字曲線', category: 'curve' },
+    { key: '-~', path: 'M2,3 Q22,3 22,13', title: '下に凸', category: 'curve' },
+    { key: '~-', path: 'M2,3 Q2,13 22,13', title: '上に凸', category: 'curve' },
+    // 直線・直角系
+    { key: '-', path: 'M2,3 L22,13', title: '直線', category: 'sharp' },
+    { key: '-|', path: 'M2,3 L22,3 L22,13', title: '横→縦', category: 'sharp' },
+    { key: '|-', path: 'M2,3 L2,13 L22,13', title: '縦→横', category: 'sharp' },
+    { key: '-|-', path: 'M2,3 L12,3 L12,13 L22,13', title: '横→縦→横', category: 'sharp' },
+    // 寸法線
+    { key: '+', path: 'M2,3 L2,13 M2,8 L22,8 M22,3 L22,13', title: '寸法線', category: 'special' },
 ];
 
 import { formatWaveDromJSON } from '../../utils/jsonFormatter';
@@ -50,7 +64,16 @@ const Toolbar: React.FC = () => {
     const cutSteps = useWaveformStore((s) => s.cutSteps);
     const pasteAtCursor = useWaveformStore((s) => s.pasteAtCursor);
 
+    // エッジプロパティ操作
+    const edgeShape = useWaveformStore((s) => s.edgeShape);
+    const edgeStartArrow = useWaveformStore((s) => s.edgeStartArrow);
+    const edgeEndArrow = useWaveformStore((s) => s.edgeEndArrow);
+    const setEdgeShape = useWaveformStore((s) => s.setEdgeShape);
+    const setEdgeStartArrow = useWaveformStore((s) => s.setEdgeStartArrow);
+    const setEdgeEndArrow = useWaveformStore((s) => s.setEdgeEndArrow);
+
     const isSelectMode = selectedTool === 'select';
+    const isEdgeMode = selectedTool === 'edge';
 
     /** 新規作成 */
     const handleNew = useCallback(() => {
@@ -117,7 +140,7 @@ const Toolbar: React.FC = () => {
 
             <div className={styles.separator} />
 
-            {/* 選択ツール + 選択操作ボタン */}
+            {/* ツール選択パレットとコンテキストメニュー */}
             <div className={styles.group}>
                 <button
                     className={`${styles.btn} ${isSelectMode ? styles.active : ''}`}
@@ -127,14 +150,25 @@ const Toolbar: React.FC = () => {
                     ↖ 選択
                 </button>
                 <button
-                    className={`${styles.btn} ${selectedTool === 'edge' ? styles.active : ''}`}
+                    className={`${styles.btn} ${isEdgeMode ? styles.active : ''}`}
                     onClick={() => setSelectedTool('edge')}
                     title="エッジツール (E)"
                 >
                     ↗ エッジ
                 </button>
+                <button
+                    className={`${styles.btn} ${!isSelectMode && !isEdgeMode ? styles.active : ''}`}
+                    onClick={() => {
+                        if (isSelectMode || isEdgeMode) setSelectedTool('0');
+                    }}
+                    title="描画ツール"
+                >
+                    ✎ 描画
+                </button>
+
                 {isSelectMode && (
                     <>
+                        <div className={styles.separator} />
                         <button
                             className={styles.toolBtn}
                             onClick={() => insertStepsAtCursor()}
@@ -177,28 +211,62 @@ const Toolbar: React.FC = () => {
                         </button>
                     </>
                 )}
-            </div>
-
-            <div className={styles.separator} />
-
-            {/* ツール選択パレット */}
-            <div className={styles.group}>
-                {TOOLS.map((t) => (
-                    <button
-                        key={t.key}
-                        className={`${styles.toolBtn} ${selectedTool === t.key ? styles.active : ''}`}
-                        onClick={() => setSelectedTool(t.key)}
-                        title={t.title}
-                    >
-                        {t.label}
-                    </button>
-                ))}
+                {isEdgeMode && (
+                    <>
+                        <div className={styles.separator} />
+                        <button
+                            className={`${styles.toolBtn} ${edgeStartArrow && edgeShape !== '+' ? styles.active : ''}`}
+                            onClick={() => setEdgeStartArrow(!edgeStartArrow)}
+                            disabled={edgeShape === '+'}
+                            title="始点矢印"
+                        >
+                            ◀
+                        </button>
+                        <div className={styles.separator} />
+                        {EDGE_SHAPES.map(s => (
+                            <button
+                                key={s.key}
+                                className={`${styles.edgeShapeBtn} ${edgeShape === s.key ? styles.active : ''}`}
+                                onClick={() => setEdgeShape(s.key)}
+                                title={s.title}
+                            >
+                                <svg viewBox="0 0 24 16" width="24" height="16">
+                                    <path d={s.path} />
+                                </svg>
+                            </button>
+                        ))}
+                        <div className={styles.separator} />
+                        <button
+                            className={`${styles.toolBtn} ${edgeEndArrow && edgeShape !== '+' ? styles.active : ''}`}
+                            onClick={() => setEdgeEndArrow(!edgeEndArrow)}
+                            disabled={edgeShape === '+'}
+                            title="終点矢印"
+                        >
+                            ▶
+                        </button>
+                    </>
+                )}
+                {!isSelectMode && !isEdgeMode && (
+                    <>
+                        <div className={styles.separator} />
+                        {TOOLS.map((t) => (
+                            <button
+                                key={t.key}
+                                className={`${styles.toolBtn} ${selectedTool === t.key ? styles.active : ''}`}
+                                onClick={() => setSelectedTool(t.key)}
+                                title={t.title}
+                            >
+                                {t.label}
+                            </button>
+                        ))}
+                    </>
+                )}
             </div>
 
             <div className={styles.separator} />
 
             {/* パネルトグル */}
-            <div className={styles.group}>
+            <div className={`${styles.group} ${styles.rightAlignedGroup}`}>
                 <button
                     className={`${styles.btn} ${configPanelVisible ? styles.active : ''}`}
                     onClick={() => setConfigPanelVisible(!configPanelVisible)}

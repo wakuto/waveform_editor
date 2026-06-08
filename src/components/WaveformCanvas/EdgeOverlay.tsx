@@ -10,11 +10,44 @@ interface EdgeOverlayProps {
     getSignalIndexFromY: (y: number) => number | null;
 }
 
+export interface ParsedEdge {
+    startNode: string;
+    endNode: string;
+    type: string;
+    text: string | undefined;
+    hasStartArrow: boolean;
+    hasEndArrow: boolean;
+    shape: string;
+}
+
+export function parseEdge(edgeStr: string): ParsedEdge | null {
+    const match = edgeStr.match(/^([a-zA-Z0-9])([~<>\-|]+|\+)([a-zA-Z0-9])(?:\s+(.*))?$/);
+    if (!match) return null;
+    const [, startNode, type, endNode, text] = match;
+    const hasStartArrow = type.startsWith('<');
+    const hasEndArrow = type.endsWith('>');
+    let shape = type;
+    if (hasStartArrow) shape = shape.slice(1);
+    if (hasEndArrow) shape = shape.slice(0, -1);
+    return { startNode, endNode, type, text, hasStartArrow, hasEndArrow, shape };
+}
+
 const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeight, getYFromSignalIndex, getSignalIndexFromY }) => {
     const waveformData = useWaveformStore((s) => s.waveformData);
     const zoom = useWaveformStore((s) => s.zoom);
     const selectedTool = useWaveformStore((s) => s.selectedTool);
     const setWaveformData = useWaveformStore((s) => s.setWaveformData);
+    
+    const edgeShape = useWaveformStore((s) => s.edgeShape);
+    const edgeStartArrow = useWaveformStore((s) => s.edgeStartArrow);
+    const edgeEndArrow = useWaveformStore((s) => s.edgeEndArrow);
+    const selectedEdgeIndex = useWaveformStore((s) => s.selectedEdgeIndex);
+    const setSelectedEdgeIndex = useWaveformStore((s) => s.setSelectedEdgeIndex);
+    const setEdgeShape = useWaveformStore((s) => s.setEdgeShape);
+    const setEdgeStartArrow = useWaveformStore((s) => s.setEdgeStartArrow);
+    const setEdgeEndArrow = useWaveformStore((s) => s.setEdgeEndArrow);
+    const beginDragEdit = useWaveformStore((s) => s.beginDragEdit);
+    const cancelDragEdit = useWaveformStore((s) => s.cancelDragEdit);
     const CELL_WIDTH = BASE_CELL_WIDTH * zoom;
 
     const isEdgeMode = selectedTool === 'edge';
@@ -111,7 +144,7 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
             return false;
         };
         updateNode(newData.signal);
-        setWaveformData(newData);
+        setWaveformData(newData, false);
 
         return newNodeName;
     }, [signals, waveformData, setWaveformData, getNextAvailableNodeName]);
@@ -125,8 +158,8 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
 
         if (newData.edge) {
             for (const edgeStr of newData.edge) {
-                const match = edgeStr.match(/^([a-zA-Z0-9])([~<>-|]+)([a-zA-Z0-9])(?:\s+(.*))?$/);
-                if (match && (match[1] === nodeName || match[3] === nodeName)) {
+                const match = parseEdge(edgeStr);
+                if (match && (match.startNode === nodeName || match.endNode === nodeName)) {
                     isUsed = true;
                     break;
                 }
@@ -160,7 +193,7 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
                 }
             };
             removeUnusedNodes(newData.signal);
-            useWaveformStore.getState().setWaveformData(newData);
+            useWaveformStore.getState().setWaveformData(newData, false);
         }
     }, []);
 
@@ -174,6 +207,8 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
 
         // エッジのテキスト編集中は新しいエッジを描画しない
         if (editingEdgeIndex !== null) return;
+
+        beginDragEdit();
 
         const rect = svgRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -246,17 +281,18 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
             const endNodeName = getOrCreateNodeAt(signalIndex, stepIndex);
             if (endNodeName && endNodeName !== drawingEdge.startNode) {
                 // エッジを追加
-                const newEdgeStr = `${drawingEdge.startNode}~>${endNodeName}`;
+                const edgeType = `${edgeStartArrow && edgeShape !== '+' ? '<' : ''}${edgeShape}${edgeEndArrow && edgeShape !== '+' ? '>' : ''}`;
+                const newEdgeStr = `${drawingEdge.startNode}${edgeType}${endNodeName}`;
                 const newData = { ...waveformData };
                 newData.edge = [...(newData.edge || []), newEdgeStr];
-                setWaveformData(newData);
+                setWaveformData(newData, false);
             } else if (endNodeName === drawingEdge.startNode) {
-                // 同じノードでクリックを離した場合（単なるクリック）、ノードを削除する
-                removeNodeIfUnused(drawingEdge.startNode);
+                // 同じノードでクリックを離した場合（単なるクリック）、キャンセルする
+                cancelDragEdit();
             }
         } else {
-            // キャンバス外で離した場合もノードを削除する
-            removeNodeIfUnused(drawingEdge.startNode);
+            // キャンバス外で離した場合もキャンセルする
+            cancelDragEdit();
         }
 
         setDrawingEdge(null);
@@ -267,27 +303,27 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
         setHoveredNode(null);
     };
 
+    const handleCanvasClick = () => {
+        if (!isEdgeMode) return;
+        // 背景クリックで選択解除
+        if (selectedEdgeIndex !== null) {
+            setSelectedEdgeIndex(null);
+        }
+    };
+
     const handleEdgeClick = (e: React.MouseEvent, index: number) => {
         if (!isEdgeMode) return;
         e.stopPropagation();
 
-        if (e.shiftKey) {
-            // Shift+Clickでエッジのタイプを切り替える
-            const newData = { ...waveformData };
-            if (newData.edge && newData.edge[index]) {
-                const edgeStr = newData.edge[index];
-                const match = edgeStr.match(/^([a-zA-Z0-9])([~<>-|]+)([a-zA-Z0-9])(?:\s+(.*))?$/);
-                if (match) {
-                    const [, startNode, type, endNode, text] = match;
-
-                    // タイプのローテーション
-                    const types = ['~>', '->', '<~>', '<->', '-|>', '|->'];
-                    const currentTypeIndex = types.indexOf(type);
-                    const nextType = currentTypeIndex !== -1 ? types[(currentTypeIndex + 1) % types.length] : '~>';
-
-                    newData.edge[index] = text ? `${startNode}${nextType}${endNode} ${text}` : `${startNode}${nextType}${endNode}`;
-                    setWaveformData(newData);
-                }
+        const newData = { ...waveformData };
+        if (newData.edge && newData.edge[index]) {
+            const edgeStr = newData.edge[index];
+            const parsed = parseEdge(edgeStr);
+            if (parsed) {
+                setSelectedEdgeIndex(index);
+                setEdgeShape(parsed.shape as any);
+                setEdgeStartArrow(parsed.hasStartArrow);
+                setEdgeEndArrow(parsed.hasEndArrow);
             }
         }
     };
@@ -300,15 +336,18 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
         const newData = { ...waveformData };
         if (newData.edge && newData.edge[index]) {
             const edgeStr = newData.edge[index];
-            const match = edgeStr.match(/^([a-zA-Z0-9])([~<>-|]+)([a-zA-Z0-9])(?:\s+(.*))?$/);
+            const parsed = parseEdge(edgeStr);
 
             // エッジを削除
             newData.edge = newData.edge.filter((_, i) => i !== index);
             setWaveformData(newData);
+            if (selectedEdgeIndex === index) {
+                setSelectedEdgeIndex(null);
+            }
 
             // 削除されたエッジのノードが他のエッジで使われているか確認し、使われていなければ削除
-            if (match) {
-                const [, startNode, , endNode] = match;
+            if (parsed) {
+                const { startNode, endNode } = parsed;
                 // setWaveformDataが非同期なので、次のレンダリングサイクルで削除判定を行う
                 setTimeout(() => {
                     removeNodeIfUnused(startNode);
@@ -330,9 +369,9 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
             const newData = { ...waveformData };
             if (newData.edge && newData.edge[editingEdgeIndex]) {
                 const edgeStr = newData.edge[editingEdgeIndex];
-                const match = edgeStr.match(/^([a-zA-Z0-9])([~<>-|]+)([a-zA-Z0-9])(?:\s+(.*))?$/);
-                if (match) {
-                    const [, startNode, type, endNode] = match;
+                const parsed = parseEdge(edgeStr);
+                if (parsed) {
+                    const { startNode, type, endNode } = parsed;
                     const newText = editingEdgeText.trim();
                     newData.edge[editingEdgeIndex] = newText ? `${startNode}${type}${endNode} ${newText}` : `${startNode}${type}${endNode}`;
                     setWaveformData(newData);
@@ -349,26 +388,35 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
     };
 
     // エッジのパスを計算
-    const getEdgePath = (startCoords: { x: number, y: number }, endCoords: { x: number, y: number }, type: string) => {
+    const getEdgePath = (startCoords: { x: number, y: number }, endCoords: { x: number, y: number }, shape: string) => {
         const dx = endCoords.x - startCoords.x;
+        const dy = endCoords.y - startCoords.y;
 
-        if (type.includes('~')) {
-            // 曲線
-            const cx1 = startCoords.x + dx * 0.5;
-            const cy1 = startCoords.y;
-            const cx2 = startCoords.x + dx * 0.5;
-            const cy2 = endCoords.y;
-            return `M ${startCoords.x} ${startCoords.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${endCoords.x} ${endCoords.y}`;
-        } else if (type.includes('-|')) {
-            // 直角 (横 -> 縦 -> 横)
-            const midX = startCoords.x + dx * 0.5;
-            return `M ${startCoords.x} ${startCoords.y} L ${midX} ${startCoords.y} L ${midX} ${endCoords.y} L ${endCoords.x} ${endCoords.y}`;
-        } else if (type.includes('|-')) {
-            // 直角 (縦 -> 横)
-            return `M ${startCoords.x} ${startCoords.y} L ${startCoords.x} ${endCoords.y} L ${endCoords.x} ${endCoords.y}`;
-        } else {
-            // 直線
-            return `M ${startCoords.x} ${startCoords.y} L ${endCoords.x} ${endCoords.y}`;
+        switch (shape) {
+            case '~':
+                return `M ${startCoords.x} ${startCoords.y} c ${0.7 * dx} 0, ${0.3 * dx} ${dy}, ${dx} ${dy}`;
+            case '-~': {
+                const cx = startCoords.y < endCoords.y ? startCoords.x : endCoords.x;
+                const cy = Math.max(startCoords.y, endCoords.y);
+                return `M ${startCoords.x} ${startCoords.y} Q ${cx} ${cy}, ${endCoords.x} ${endCoords.y}`;
+            }
+            case '~-': {
+                const cx = startCoords.y < endCoords.y ? endCoords.x : startCoords.x;
+                const cy = Math.min(startCoords.y, endCoords.y);
+                return `M ${startCoords.x} ${startCoords.y} Q ${cx} ${cy}, ${endCoords.x} ${endCoords.y}`;
+            }
+            case '-':
+                return `M ${startCoords.x} ${startCoords.y} l ${dx} ${dy}`;
+            case '-|':
+                return `M ${startCoords.x} ${startCoords.y} l ${dx} 0 l 0 ${dy}`;
+            case '|-':
+                return `M ${startCoords.x} ${startCoords.y} l 0 ${dy} l ${dx} 0`;
+            case '-|-':
+                return `M ${startCoords.x} ${startCoords.y} l ${dx / 2} 0 l 0 ${dy} l ${dx / 2} 0`;
+            case '+':
+                return `M ${startCoords.x} ${startCoords.y} L ${endCoords.x} ${endCoords.y} M ${startCoords.x} ${startCoords.y - 5} L ${startCoords.x} ${startCoords.y + 5} M ${endCoords.x} ${endCoords.y - 5} L ${endCoords.x} ${endCoords.y + 5}`;
+            default:
+                return `M ${startCoords.x} ${startCoords.y} L ${endCoords.x} ${endCoords.y}`;
         }
     };
 
@@ -377,28 +425,31 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
         if (!waveformData.edge) return null;
 
         return waveformData.edge.map((edgeStr, index) => {
-            // 例: 'a~>b text'
-            const match = edgeStr.match(/^([a-zA-Z0-9])([~<>-|]+)([a-zA-Z0-9])(?:\s+(.*))?$/);
-            if (!match) return null;
+            const parsed = parseEdge(edgeStr);
+            if (!parsed) return null;
 
-            const [, startNode, type, endNode, text] = match;
+            const { startNode, endNode, text, hasStartArrow, hasEndArrow, shape } = parsed;
             const startCoords = getNodeCoords(startNode);
             const endCoords = getNodeCoords(endNode);
 
             if (!startCoords || !endCoords) return null;
 
-            const path = getEdgePath(startCoords, endCoords, type);
+            const path = getEdgePath(startCoords, endCoords, shape);
             const isHovered = hoveredEdgeIndex === index;
+            const isSelected = selectedEdgeIndex === index;
             const isEditing = editingEdgeIndex === index;
 
             // 矢印のマーカーID
             let markerEnd = '';
             let markerStart = '';
-            if (type.includes('>')) markerEnd = isHovered && isEdgeMode ? 'url(#arrowhead-hover)' : 'url(#arrowhead)';
-            if (type.includes('<')) markerStart = isHovered && isEdgeMode ? 'url(#arrowhead-start-hover)' : 'url(#arrowhead-start)';
+            if (hasEndArrow) markerEnd = (isHovered || isSelected) && isEdgeMode ? 'url(#arrowhead-hover)' : 'url(#arrowhead)';
+            if (hasStartArrow) markerStart = (isHovered || isSelected) && isEdgeMode ? 'url(#arrowhead-start-hover)' : 'url(#arrowhead-start)';
 
-            const midX = (startCoords.x + endCoords.x) / 2;
-            const midY = (startCoords.y + endCoords.y) / 2 - 5;
+            // 中間点の計算 (テキストの配置用)
+            let midX = (startCoords.x + endCoords.x) / 2;
+            let midY = (startCoords.y + endCoords.y) / 2 - 5;
+            if (shape === '-|') { midX = endCoords.x; midY = startCoords.y - 5; }
+            else if (shape === '|-') { midX = startCoords.x; midY = endCoords.y - 5; }
 
             return (
                 <g key={index}
@@ -422,7 +473,7 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
                     <path
                         d={path}
                         fill="none"
-                        stroke={isHovered && isEdgeMode ? "#ff4444" : "#4a9df0"}
+                        stroke={(isHovered || isSelected) && isEdgeMode ? "#ff4444" : "#4a9df0"}
                         strokeWidth={2}
                         markerEnd={markerEnd}
                         markerStart={markerStart}
@@ -455,7 +506,7 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
                         <text
                             x={midX}
                             y={midY}
-                            fill={isHovered && isEdgeMode ? "#ff4444" : "#a0a0b0"}
+                            fill={(isHovered || isSelected) && isEdgeMode ? "#ff4444" : "#a0a0b0"}
                             fontSize={12}
                             textAnchor="middle"
                         >
@@ -478,9 +529,9 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
         // 関連するエッジも削除
         if (newData.edge) {
             newData.edge = newData.edge.filter(edgeStr => {
-                const match = edgeStr.match(/^([a-zA-Z0-9])([~<>-|]+)([a-zA-Z0-9])(?:\s+(.*))?$/);
-                if (match) {
-                    return match[1] !== nodeName && match[3] !== nodeName;
+                const parsed = parseEdge(edgeStr);
+                if (parsed) {
+                    return parsed.startNode !== nodeName && parsed.endNode !== nodeName;
                 }
                 return true;
             });
@@ -559,12 +610,10 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
 
                     if (newData.edge) {
                         newData.edge = newData.edge.map(edgeStr => {
-                            const match = edgeStr.match(/^([a-zA-Z0-9])([~<>-|]+)([a-zA-Z0-9])(?:\s+(.*))?$/);
-                            if (match) {
-                                let startNode = match[1];
-                                const type = match[2];
-                                let endNode = match[3];
-                                const text = match[4];
+                            const parsed = parseEdge(edgeStr);
+                            if (parsed) {
+                                let { startNode, endNode } = parsed;
+                                const { type, text } = parsed;
                                 if (startNode === editingNodeChar) startNode = newChar;
                                 if (endNode === editingNodeChar) endNode = newChar;
                                 return text ? `${startNode}${type}${endNode} ${text}` : `${startNode}${type}${endNode}`;
@@ -677,6 +726,7 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
+            onClick={handleCanvasClick}
         >
             <defs>
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
