@@ -1,8 +1,7 @@
 import type { WaveSignal, WaveSignalOrGroup } from '../types/wavedrom';
 
-/** WaveSignalOrGroupがWaveSignalかどうかを判定 */
 export function isWaveSignal(s: WaveSignalOrGroup): s is WaveSignal {
-    return typeof (s as WaveSignal).wave === 'string';
+    return s !== null && typeof s === 'object' && !Array.isArray(s) && 'name' in s;
 }
 
 /** signal配列をフラットなWaveSignalのリストに変換 */
@@ -265,9 +264,9 @@ function buildBoxSegment(
     return { d, fill, fillColor };
 }
 
-/** wave文字列から各セルの実効値（'.'を解決した）を返す */
-export function resolveWave(wave: string): string[] {
+export function resolveWave(wave?: string): string[] {
     const result: string[] = [];
+    if (!wave) return result;
     let prev = '0';
     for (const ch of wave) {
         if (ch === '.' || ch === '|') {
@@ -280,9 +279,9 @@ export function resolveWave(wave: string): string[] {
     return result;
 }
 
-/** wave文字列中のdataキャラクタが何番目のdata[]に対応するかのマップを返す */
-export function buildDataIndexMap(wave: string): Map<number, number> {
+export function buildDataIndexMap(wave?: string): Map<number, number> {
     const map = new Map<number, number>();
+    if (!wave) return map;
     let count = 0;
     for (let i = 0; i < wave.length; i++) {
         const ch = wave[i];

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { useWaveformStore } from '../../store/useWaveformStore';
 import type { WaveTool } from '../../types/wavedrom';
-import { getSignalList, BASE_CELL_WIDTH, ROW_HEIGHT, LABEL_WIDTH } from '../../utils/waveformUtils';
+import { isWaveSignal, getSignalList, BASE_CELL_WIDTH, ROW_HEIGHT, LABEL_WIDTH } from '../../utils/waveformUtils';
 import WaveRow from './WaveRow';
 import EdgeOverlay from './EdgeOverlay';
 import styles from './WaveformCanvas.module.css';
@@ -126,7 +126,7 @@ const WaveformCanvas: React.FC = () => {
     const isSelectDragging = useRef(false);
 
     const signals = getSignalList(waveformData.signal);
-    const actualMaxLen = signals.reduce((m, s) => Math.max(m, s.wave.length), 0);
+    const actualMaxLen = signals.reduce((m, s) => Math.max(m, s.wave?.length || 0), 0);
     const clientCells = Math.floor(scrollState.clientWidth / CELL_WIDTH);
     const scrollCells = Math.ceil(scrollState.scrollLeft / CELL_WIDTH);
     // スクロール位置が0の時は余分なステップを追加せず、画面にぴったり収まる数にする
@@ -143,7 +143,7 @@ const WaveformCanvas: React.FC = () => {
 
     const handleLabelBlur = useCallback(() => {
         if (editingIndex !== null) {
-            renameSignal(editingIndex, editingName.trim() || 'signal');
+            renameSignal(editingIndex, editingName);
             setEditingIndex(null);
         }
     }, [editingIndex, editingName, renameSignal]);
@@ -393,8 +393,8 @@ const WaveformCanvas: React.FC = () => {
     const handleGroupLabelBlur = useCallback(() => {
         if (editingGroupIndex !== null) {
             const renameGroup = useWaveformStore.getState().renameGroup;
-            if (renameGroup && editingGroupName.trim() !== '') {
-                renameGroup(editingGroupIndex, editingGroupName.trim());
+            if (renameGroup) {
+                renameGroup(editingGroupIndex, editingGroupName);
             }
             setEditingGroupIndex(null);
         }
@@ -486,7 +486,7 @@ const WaveformCanvas: React.FC = () => {
                         const [, ...children] = item;
                         traverse(children, currentPath);
                     }
-                } else if (item && typeof (item as import('../../types/wavedrom').WaveSignal).wave === 'string') {
+                } else if (isWaveSignal(item)) {
                     rowMap.push({ y: currentY, height: ROW_HEIGHT, signalIndex: flatIndex });
                     currentY += ROW_HEIGHT;
                     flatIndex++;
@@ -784,7 +784,7 @@ const WaveformCanvas: React.FC = () => {
                                     )}
                                 </div>
                             );
-                        } else if (item && typeof (item as import('../../types/wavedrom').WaveSignal).wave === 'string') {
+                        } else if (isWaveSignal(item)) {
                             const sig = item as import('../../types/wavedrom').WaveSignal;
                             const idx = flatIndex++;
                             const pathStr = path.join(',');

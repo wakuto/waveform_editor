@@ -29,7 +29,7 @@ export interface StepClipboard {
 /** 単一信号の定義 */
 export interface WaveSignal {
     name: string;
-    wave: string;
+    wave?: string;
     data?: string[];
     phase?: number;
     period?: number;

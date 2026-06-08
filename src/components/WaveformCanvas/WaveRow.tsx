@@ -34,7 +34,7 @@ const WaveRow: React.FC<WaveRowProps> = ({
     hoverBoundary = null,
     maxLen = 0,
 }) => {
-    const { wave, data } = signal;
+    const { wave = '', data } = signal;
     const renderLen = Math.max(maxLen, wave.length);
     const selectedTool = useWaveformStore((s) => s.selectedTool);
     const setCell = useWaveformStore((s) => s.setCell);

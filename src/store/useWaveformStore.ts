@@ -88,14 +88,14 @@ function pushHistory(state: AppState, prev: WaveDromData): Pick<AppState, 'undoS
 
 /** wave の位置 position に count 文字分の '.' を挿入する */
 function insertStepsIntoSignal(sig: WaveSignal, position: number, count: number): WaveSignal {
-    const wave = sig.wave;
+    const wave = sig.wave || '';
     const newWave = wave.slice(0, position) + '.'.repeat(count) + wave.slice(position);
     return { ...sig, wave: newWave };
 }
 
 /** wave の from〜to（inclusive）を削除し、対応する data エントリも削除する */
 function deleteStepsFromSignal(sig: WaveSignal, from: number, to: number): WaveSignal {
-    const wave = sig.wave;
+    const wave = sig.wave || '';
     let dataCountBefore = 0;
     let dataCountInRange = 0;
     for (let i = 0; i < wave.length; i++) {
@@ -177,11 +177,12 @@ function deleteStepsFromSignal(sig: WaveSignal, from: number, to: number): WaveS
 
 /** wave の from〜to の wave スライスと対応する data エントリを抽出する */
 function copyStepsFromSignal(sig: WaveSignal, from: number, to: number): { wave: string; data: string[] | undefined } {
-    let waveSlice = sig.wave.slice(from, to + 1);
+    const wave = sig.wave || '';
+    let waveSlice = wave.slice(from, to + 1);
     let dataStart = 0;
     let dataCount = 0;
-    for (let i = 0; i < sig.wave.length; i++) {
-        const ch = sig.wave[i];
+    for (let i = 0; i < wave.length; i++) {
+        const ch = wave[i];
         const isData = ch === '=' || (ch >= '2' && ch <= '9');
         if (isData) {
             if (i < from) dataStart++;
@@ -197,7 +198,7 @@ function copyStepsFromSignal(sig: WaveSignal, from: number, to: number): { wave:
         let resolvedData: string | undefined = undefined;
 
         for (let i = from - 1; i >= 0; i--) {
-            const ch = sig.wave[i];
+            const ch = wave[i];
             if (ch !== '.' && ch !== '|') {
                 resolvedChar = ch;
                 if (ch === '=' || (ch >= '2' && ch <= '9')) {
@@ -227,7 +228,7 @@ function copyStepsFromSignal(sig: WaveSignal, from: number, to: number): { wave:
 
 /** wave の position に clipWave を挿入し、対応する data エントリも挿入する */
 function pasteStepsIntoSignal(sig: WaveSignal, position: number, clipWave: string, clipData: string[] | undefined): WaveSignal {
-    const wave = sig.wave;
+    const wave = sig.wave || '';
     let dataCountBefore = 0;
     for (let i = 0; i < Math.min(position, wave.length); i++) {
         const ch = wave[i];
@@ -410,7 +411,7 @@ function mapAllSignals(
 function updateFlatSignal(
     data: WaveDromData,
     flatIndex: number,
-    updater: (signal: { name: string; wave: string; data?: string[] }) => { name: string; wave: string; data?: string[] }
+    updater: (signal: { name: string; wave?: string; data?: string[] }) => { name: string; wave?: string; data?: string[] }
 ): WaveDromData {
     const flatSignals = getSignalList(data.signal);
     if (flatIndex < 0 || flatIndex >= flatSignals.length) return data;
@@ -422,13 +423,14 @@ function updateFlatSignal(
     const newData = JSON.parse(JSON.stringify(data)) as WaveDromData;
     const newFlat = getSignalList(newData.signal);
 
-    Object.assign(newFlat[flatIndex], updated);
+    const targetRef = newFlat[flatIndex] as unknown as Record<string, unknown>;
+    Object.keys(targetRef).forEach(k => delete targetRef[k]);
+    Object.assign(targetRef, updated);
 
     // undefined のプロパティは削除する
-    Object.keys(newFlat[flatIndex]).forEach(key => {
-        const targetObj = newFlat[flatIndex] as unknown as Record<string, unknown>;
-        if (targetObj[key] === undefined) {
-            delete targetObj[key];
+    Object.keys(targetRef).forEach(key => {
+        if (targetRef[key] === undefined) {
+            delete targetRef[key];
         }
     });
 
@@ -468,7 +470,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
         set((state) => {
             const prev = state.waveformData;
             const newData = updateFlatSignal(prev, signalIndex, (sig) => {
-                const waveArr = sig.wave.split('');
+                const waveArr = (sig.wave || '').split('');
                 // 波形文字列を必要な長さに拡張
                 while (waveArr.length <= stepIndex) waveArr.push('.');
                 waveArr[stepIndex] = value;
@@ -488,7 +490,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const from = Math.min(startStep, endStep);
             const to = Math.max(startStep, endStep);
             const newData = updateFlatSignal(prev, signalIndex, (sig) => {
-                const waveArr = sig.wave.split('');
+                const waveArr = (sig.wave || '').split('');
                 while (waveArr.length <= to) waveArr.push('.');
                 for (let i = from; i <= to; i++) waveArr[i] = value;
                 return { ...sig, wave: waveArr.join('') };
@@ -503,7 +505,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const to = Math.max(dragStartStep, currentStep);
 
             const newData = updateFlatSignal(prev, signalIndex, (sig) => {
-                const waveArr = sig.wave.split('');
+                const waveArr = (sig.wave || '').split('');
                 while (waveArr.length <= to) waveArr.push('.');
 
                 // 上書きされる前の to の位置の状態を解決
@@ -577,8 +579,9 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
 
             // stepIndexがdataの何番目に対応するかを計算
             let dataCount = 0;
-            for (let i = 0; i <= stepIndex && i < sig.wave.length; i++) {
-                const ch = sig.wave[i];
+            const wave = sig.wave || '';
+            for (let i = 0; i <= stepIndex && i < wave.length; i++) {
+                const ch = wave[i];
                 if (ch === '=' || (ch >= '2' && ch <= '9')) {
                     if (i === stepIndex) break;
                     dataCount++;
@@ -596,8 +599,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
     addSignal: (afterIndex) =>
         set((state) => {
             const prev = state.waveformData;
-            const maxLen = getSignalList(prev.signal).reduce((m, s) => Math.max(m, s.wave.length), 8);
-            const newSig = { name: 'new_signal', wave: '.'.repeat(maxLen) };
+            const newSig = { name: '' };
             const newSignals = [...prev.signal];
 
             if (afterIndex === undefined || afterIndex < 0) {
@@ -633,7 +635,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
                     if (Array.isArray(item)) {
                         const [groupName, ...children] = item;
                         result.push([groupName, ...filterSignals(children)] as WaveGroup);
-                    } else if (item && typeof (item as WaveSignal).wave === 'string') {
+                    } else if (isWaveSignal(item)) {
                         const isTarget = currentSignalIndex === index;
                         currentSignalIndex++;
 
@@ -827,7 +829,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const renameItem = (item: WaveSignalOrGroup) => {
                 if (Array.isArray(item)) {
                     item[0] = item[0] + '_copy';
-                } else if (item && typeof (item as WaveSignal).wave === 'string') {
+                } else if (isWaveSignal(item)) {
                     (item as WaveSignal).name = (item as WaveSignal).name + '_copy';
                 }
             };
@@ -903,8 +905,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const info = getArrayAndIndex(newSignals, path);
             if (!info) return {};
 
-            const maxLen = getSignalList(prev.signal).reduce((m, s) => Math.max(m, s.wave.length), 8);
-            const newSig = { name: 'new_signal', wave: '.'.repeat(maxLen) };
+            const newSig = { name: '' };
 
             info.array.splice(info.index + 1, 0, newSig);
 
@@ -944,7 +945,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const newData: WaveDromData = {
                 ...prev,
                 signal: prev.signal.map((s) =>
-                    isWaveSignal(s) ? { ...s, wave: s.wave + '.' } : s
+                    isWaveSignal(s) ? { ...s, wave: (s.wave || '') + '.' } : s
                 ),
             };
             return { waveformData: newData, ...pushHistory(state, prev) };
@@ -956,7 +957,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             const newData: WaveDromData = {
                 ...prev,
                 signal: prev.signal.map((s) =>
-                    isWaveSignal(s) && s.wave.length > 1 ? { ...s, wave: s.wave.slice(0, -1) } : s
+                    isWaveSignal(s) && (s.wave || '').length > 1 ? { ...s, wave: (s.wave || '').slice(0, -1) } : s
                 ),
             };
             return { waveformData: newData, ...pushHistory(state, prev) };
@@ -984,22 +985,23 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
         const flatSignals = getSignalList(state.waveformData.signal);
         if (signalIndex < 0 || signalIndex >= flatSignals.length) return;
         const sig = flatSignals[signalIndex];
-        const resolved = resolveWave(sig.wave);
+        const waveStr = sig.wave || '';
+        const resolved = resolveWave(waveStr);
         const rch = resolved[stepIndex];
         if (!rch || (rch !== '=' && (rch < '2' || rch > '9'))) return;
 
         let src = stepIndex;
-        while (src > 0 && sig.wave[src] === '.') src--;
+        while (src > 0 && waveStr[src] === '.') src--;
 
         // src が | などの場合はさらに遡る必要があるかもしれないが、
         // 基本的にデータセルの開始位置は = か 2~9
-        while (src > 0 && sig.wave[src] !== '=' && (sig.wave[src] < '2' || sig.wave[src] > '9')) {
+        while (src > 0 && waveStr[src] !== '=' && (waveStr[src] < '2' || waveStr[src] > '9')) {
             src--;
         }
 
         let dataIdx = 0;
         for (let i = 0; i <= src; i++) {
-            const ch = sig.wave[i];
+            const ch = waveStr[i];
             if (ch === '=' || (ch >= '2' && ch <= '9')) {
                 if (i === src) break;
                 dataIdx++;
@@ -1063,7 +1065,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
 
             const newData = { ...prev, signal: newSignals };
             // 削除後のカーソル位置: 選択開始位置（最大値クランプ）
-            const maxLen = getSignalList(newData.signal).reduce((m, s) => Math.max(m, s.wave.length), 0);
+            const maxLen = getSignalList(newData.signal).reduce((m, s) => Math.max(m, s.wave?.length || 0), 0);
             const newCursor = Math.min(from, maxLen);
             return {
                 waveformData: newData,
@@ -1140,7 +1142,7 @@ export const useWaveformStore = create<WaveformStore>((set, get) => ({
             }
 
             const newData = { ...prev, signal: newSignals };
-            const maxLen = getSignalList(newData.signal).reduce((m, s) => Math.max(m, s.wave.length), 0);
+            const maxLen = getSignalList(newData.signal).reduce((m, s) => Math.max(m, s.wave?.length || 0), 0);
             const newCursor = Math.min(from, maxLen);
             return {
                 waveformData: newData,

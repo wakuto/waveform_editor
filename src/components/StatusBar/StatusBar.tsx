@@ -33,7 +33,7 @@ const StatusBar: React.FC = () => {
     const stepSelection = useWaveformStore((s) => s.stepSelection);
 
     const signals = getSignalList(waveformData.signal);
-    const maxLen = signals.reduce((m, s) => Math.max(m, s.wave.length), 0);
+    const maxLen = signals.reduce((m, s) => Math.max(m, s.wave?.length || 0), 0);
 
     const isSelectMode = selectedTool === 'select';
 
