@@ -395,16 +395,10 @@ const EdgeOverlay: React.FC<EdgeOverlayProps> = ({ totalWaveWidth, totalRowsHeig
         switch (shape) {
             case '~':
                 return `M ${startCoords.x} ${startCoords.y} c ${0.7 * dx} 0, ${0.3 * dx} ${dy}, ${dx} ${dy}`;
-            case '-~': {
-                const cx = startCoords.y < endCoords.y ? startCoords.x : endCoords.x;
-                const cy = Math.max(startCoords.y, endCoords.y);
-                return `M ${startCoords.x} ${startCoords.y} Q ${cx} ${cy}, ${endCoords.x} ${endCoords.y}`;
-            }
-            case '~-': {
-                const cx = startCoords.y < endCoords.y ? endCoords.x : startCoords.x;
-                const cy = Math.min(startCoords.y, endCoords.y);
-                return `M ${startCoords.x} ${startCoords.y} Q ${cx} ${cy}, ${endCoords.x} ${endCoords.y}`;
-            }
+            case '-~':
+                return `M ${startCoords.x} ${startCoords.y} Q ${endCoords.x} ${startCoords.y}, ${endCoords.x} ${endCoords.y}`;
+            case '~-':
+                return `M ${startCoords.x} ${startCoords.y} Q ${startCoords.x} ${endCoords.y}, ${endCoords.x} ${endCoords.y}`;
             case '-':
                 return `M ${startCoords.x} ${startCoords.y} l ${dx} ${dy}`;
             case '-|':
