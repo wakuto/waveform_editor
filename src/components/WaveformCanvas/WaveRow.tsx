@@ -257,7 +257,7 @@ const WaveRow: React.FC<WaveRowProps> = ({
                     <path
                         d={seg.d}
                         fill="none"
-                        stroke={getStrokeColor(rch)}
+                        stroke={getStrokeColor(rch!)}
                         strokeWidth={1.5}
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -305,7 +305,7 @@ const WaveRow: React.FC<WaveRowProps> = ({
                         y={ROW_HEIGHT / 2 + 4}
                         textAnchor="middle"
                         fontSize={11}
-                        fill={DATA_COLORS[rch] ?? '#4a9df0'}
+                        fill={rch ? DATA_COLORS[rch] ?? '#4a9df0' : '#4a9df0'}
                         style={{ userSelect: 'none', pointerEvents: 'none' }}
                     >
                         {label}
