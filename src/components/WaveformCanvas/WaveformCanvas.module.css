@@ -48,6 +48,8 @@
 .rows {
     display: flex;
     flex-direction: column;
+    width: fit-content;
+    min-width: 100%;
 }
 
 .row {
@@ -57,6 +59,8 @@
     cursor: default;
     transition: background 0.1s;
     box-sizing: border-box;
+    width: fit-content;
+    min-width: 100%;
 }
 
 .rowInGroup {
@@ -126,6 +130,8 @@
 .groupContainer {
     display: flex;
     flex-direction: column;
+    width: fit-content;
+    min-width: 100%;
 }
 
 .groupHeader {

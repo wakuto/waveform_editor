@@ -58,6 +58,33 @@ const WaveformCanvas: React.FC = () => {
     const renameSignal = useWaveformStore((s) => s.renameSignal);
     const moveItem = useWaveformStore((s) => s.moveItem);
 
+    const canvasRef = useRef<HTMLDivElement>(null);
+    const [scrollState, setScrollState] = useState({ scrollLeft: 0, clientWidth: 1000 });
+
+    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        const sl = e.currentTarget.scrollLeft;
+        const cw = e.currentTarget.clientWidth;
+        setScrollState(prev => {
+            if (Math.abs(prev.scrollLeft - sl) > CELL_WIDTH || Math.abs(prev.clientWidth - cw) > 10) {
+                return { scrollLeft: sl, clientWidth: cw };
+            }
+            return prev;
+        });
+    }, [CELL_WIDTH]);
+
+    React.useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        setScrollState({ scrollLeft: canvas.scrollLeft, clientWidth: canvas.clientWidth });
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setScrollState(prev => ({ ...prev, clientWidth: entry.contentRect.width }));
+            }
+        });
+        resizeObserver.observe(canvas);
+        return () => resizeObserver.disconnect();
+    }, []);
+
     const addGroup = useWaveformStore((s) => s.addGroup);
 
     // 選択ツール state
@@ -99,7 +126,14 @@ const WaveformCanvas: React.FC = () => {
     const isSelectDragging = useRef(false);
 
     const signals = getSignalList(waveformData.signal);
-    const maxLen = signals.reduce((m, s) => Math.max(m, s.wave.length), 1);
+    const actualMaxLen = signals.reduce((m, s) => Math.max(m, s.wave.length), 0);
+    const clientCells = Math.floor(scrollState.clientWidth / CELL_WIDTH);
+    const scrollCells = Math.ceil(scrollState.scrollLeft / CELL_WIDTH);
+    // スクロール位置が0の時は余分なステップを追加せず、画面にぴったり収まる数にする
+    const padding = scrollState.scrollLeft > 0 ? 5 : 0;
+    const visibleMaxLen = clientCells + scrollCells + padding;
+    // データがある場合は、その終端+2を最低限の幅とする（ただし画面幅を下回らない）
+    const maxLen = Math.max(actualMaxLen + 2, visibleMaxLen, 1);
 
     // ─── 信号名編集 ──────────────────────────────────────────────────
     const handleLabelDoubleClick = useCallback(
@@ -485,6 +519,7 @@ const WaveformCanvas: React.FC = () => {
     const handleWaveOverlayMouseDown = useCallback(
         (e: React.MouseEvent<HTMLDivElement>) => {
             if (e.button !== 0) return;
+            (document.activeElement as HTMLElement)?.blur();
             e.preventDefault();
             const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
             const relX = e.clientX - rect.left;
@@ -562,8 +597,6 @@ const WaveformCanvas: React.FC = () => {
         [maxLen, getSignalIndexFromY, CELL_WIDTH]
     );
 
-    const canvasRef = useRef<HTMLDivElement>(null);
-
     React.useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -620,6 +653,7 @@ const WaveformCanvas: React.FC = () => {
         <div
             className={styles.canvas}
             ref={canvasRef}
+            onScroll={handleScroll}
             onContextMenu={(e) => {
                 const target = e.target as HTMLElement;
                 if (!target.closest(EDITABLE_CONTEXT_MENU_SELECTOR)) {
@@ -633,7 +667,7 @@ const WaveformCanvas: React.FC = () => {
                 {/* stepsHeader: 選択モード時はインタラクティブ */}
                 <div
                     className={`${styles.stepsHeader} ${isSelectMode ? styles.stepsHeaderSelect : ''}`}
-                    style={{ position: 'relative' }}
+                    style={{ position: 'relative', width: totalWaveWidth, minWidth: totalWaveWidth }}
                     onMouseDown={isSelectMode ? handleHeaderMouseDown : undefined}
                     onMouseMove={isSelectMode ? handleHeaderMouseMove : undefined}
                     onMouseUp={isSelectMode ? handleHeaderMouseUp : undefined}
@@ -812,6 +846,7 @@ const WaveformCanvas: React.FC = () => {
                                             stepSelection={stepSelection}
                                             isSelectMode={isSelectMode}
                                             hoverBoundary={hoverBoundary}
+                                            maxLen={maxLen}
                                         />
                                     </div>
                                 </div>

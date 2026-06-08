@@ -21,6 +21,7 @@ interface WaveRowProps {
     stepSelection?: { from: number; to: number; signalIndex?: number } | null;
     isSelectMode?: boolean;
     hoverBoundary?: number | null;
+    maxLen?: number;
 }
 
 const WaveRow: React.FC<WaveRowProps> = ({
@@ -31,8 +32,10 @@ const WaveRow: React.FC<WaveRowProps> = ({
     stepSelection = null,
     isSelectMode = false,
     hoverBoundary = null,
+    maxLen = 0,
 }) => {
     const { wave, data } = signal;
+    const renderLen = Math.max(maxLen, wave.length);
     const selectedTool = useWaveformStore((s) => s.selectedTool);
     const setCell = useWaveformStore((s) => s.setCell);
     const setCellRangeWithContinue = useWaveformStore((s) => s.setCellRangeWithContinue);
@@ -74,6 +77,7 @@ const WaveRow: React.FC<WaveRowProps> = ({
     const handleMouseDown = useCallback(
         (e: React.MouseEvent<SVGRectElement>, stepIndex: number) => {
             if (e.button !== 0) return;
+            (document.activeElement as HTMLElement)?.blur();
             // ブラウザのネイティブドラッグを防止
             e.preventDefault();
             // ドラッグ開始前に現在状態を履歴に1回だけ記録
@@ -159,7 +163,7 @@ const WaveRow: React.FC<WaveRowProps> = ({
         []
     );
 
-    const totalWidth = wave.length * CELL_WIDTH;
+    const totalWidth = renderLen * CELL_WIDTH;
 
     // '.' を前の有効な状態に解決した配列（色・パス生成に使用）
     const resolved = resolveWave(wave);
@@ -176,17 +180,18 @@ const WaveRow: React.FC<WaveRowProps> = ({
 
     const segments: React.ReactNode[] = [];
 
-    for (let i = 0; i < wave.length; i++) {
-        const rawCh = wave[i];                          // 生の文字（継続判定用）
-        const rch = resolved[i];                        // 解決済み文字（描画用）
-        const rprev = i > 0 ? resolved[i - 1] : null;  // 解決済み前の文字
+    for (let i = 0; i < renderLen; i++) {
+        const hasWave = i < wave.length;
+        const rawCh = hasWave ? wave[i] : null;                          // 生の文字（継続判定用）
+        const rch = hasWave ? resolved[i] : null;                        // 解決済み文字（描画用）
+        const rprev = i > 0 && i <= wave.length ? resolved[i - 1] : null;  // 解決済み前の文字
         const isContinue = rawCh === '.' || rawCh === '|';               // このセルが '.' / '|' → 左端 < なし
         const nextRawCh = i + 1 < wave.length ? wave[i + 1] : null;
         const isNextContinue = nextRawCh === '.' || nextRawCh === '|';       // 次のセルが '.' / '|' → 右端 > なし
         const x = i * CELL_WIDTH;
-        const seg = getSegmentPath(rch, rprev, x, CELL_WIDTH, isContinue, isNextContinue);
+        const seg = hasWave && rch !== null ? getSegmentPath(rch, rprev, x, CELL_WIDTH, isContinue, isNextContinue) : { d: '', fill: '', fillColor: '' };
         const isHovered = hoverStep === i;
-        const di = dataIndexMap.get(i);
+        const di = hasWave ? dataIndexMap.get(i) : undefined;
         const label = di !== undefined ? (data?.[di] ?? '') : undefined;
 
         // ドラッグ範囲内かどうか
@@ -335,7 +340,7 @@ const WaveRow: React.FC<WaveRowProps> = ({
             onDragStart={(e) => e.preventDefault()}
         >
             {/* グリッドライン */}
-            {Array.from({ length: wave.length + 1 }, (_, i) => (
+            {Array.from({ length: renderLen + 1 }, (_, i) => (
                 <line
                     key={`grid-${i}`}
                     x1={i * CELL_WIDTH}
